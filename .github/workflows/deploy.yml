@@ -104,7 +104,7 @@ jobs:
             --resource-group "$RESOURCE_GROUP"
 
       - name: Wait for App Startup (DEV)
-        run: sleep 90
+        run: sleep 120
 
       - name: Health Check (DEV)
         run: |
