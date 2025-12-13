@@ -8,11 +8,12 @@ terraform {
     }
   }
 
+  # Terraform Cloud remote state + runs
   backend "remote" {
     organization = "AzureDevOpsDemo"
 
     workspaces {
-      name = "devops-demo"
+      prefix = "devops-demo-"
     }
   }
 }

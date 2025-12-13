@@ -2,17 +2,13 @@ from flask import Flask, jsonify
 
 app = Flask(__name__)
 
-
-@app.route("/health")
+@app.get("/health")
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify(status="ok")
 
-
-@app.route("/")
+@app.get("/")
 def home():
-    return "Hello from Azure Web App for Containers via GitHub Actions & Terraform!"
-
+    return "DevOps Demo App is running!"
 
 if __name__ == "__main__":
-    # Runs on port 3000 and listens on all interfaces
     app.run(host="0.0.0.0", port=3000)

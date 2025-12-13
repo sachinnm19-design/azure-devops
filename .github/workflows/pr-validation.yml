@@ -6,8 +6,11 @@ on:
       - main
 
 jobs:
-  validate:
+  pr-validate:
     runs-on: ubuntu-latest
+
+    env:
+      TF_WORKSPACE: dev   # ⭐ CRITICAL FIX
 
     steps:
       - name: Checkout repository
@@ -18,19 +21,20 @@ jobs:
 
       - name: Configure Terraform Cloud Token
         run: |
-          echo 'credentials "app.terraform.io" { token = "${{ secrets.TF_API_TOKEN }}" }' > ~/.terraformrc
+          cat > ~/.terraformrc <<'EOF'
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOF
 
+      # ✅ Now init knows which workspace to use
       - name: Terraform Init
-        working-directory: ./infra
-        run: terraform init
+        working-directory: infra
+        run: terraform init -upgrade
 
-      - name: Terraform Validate
-        working-directory: ./infra
-        run: terraform validate
-
-      - name: Terraform Plan
-        working-directory: ./infra
+      - name: Terraform Plan (DEV)
+        working-directory: infra
         run: terraform plan
 
-      - name: Docker Build (no push)
-        run: docker build -t demo-app:test ./app
+      - name: Docker Build Validation
+        run: docker build -t pr-validate ./app
