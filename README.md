@@ -35,6 +35,7 @@ Terraform state and environment separation are handled using Terraform Cloud wor
 ---
 ## 3. Repository Structure
 
+```
 .
 ├── app/
 │ ├── app.py / index.js
@@ -52,7 +53,8 @@ Terraform state and environment separation are handled using Terraform Cloud wor
 │ ├── pr-validation.yml
 │ └── cd-dev-prod.yml
 │
-└── README.md```
+└── README.md
+```
 
 
 ---
