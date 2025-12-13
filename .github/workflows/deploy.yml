@@ -11,13 +11,17 @@ env:
   IMAGE_TAG: latest
 
 jobs:
-# =========================================================
-# DEV DEPLOYMENT (NO APPROVAL)
-# =========================================================
+# =====================================================
+# DEV DEPLOYMENT (AUTOMATIC)
+# =====================================================
   deploy_dev:
     name: Deploy to DEV
     runs-on: ubuntu-latest
     environment: dev
+
+    # ⭐ CRITICAL: must be set BEFORE terraform init
+    env:
+      TF_WORKSPACE: dev
 
     steps:
       # ---------------------------
@@ -27,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
 
       # ---------------------------
-      # Azure Login
+      # Azure Login (needed for ACR + WebApp ops)
       # ---------------------------
       - name: Login to Azure
         uses: azure/login@v1
@@ -55,11 +59,6 @@ jobs:
         working-directory: infra
         run: terraform init -upgrade
 
-      - name: Select DEV Workspace
-        working-directory: infra
-        run: |
-          terraform workspace select dev || terraform workspace new dev
-
       - name: Terraform Plan (DEV)
         working-directory: infra
         run: terraform plan
@@ -71,7 +70,7 @@ jobs:
       # ---------------------------
       # Export Terraform Outputs
       # ---------------------------
-      - name: Export DEV Terraform Outputs
+      - name: Export Terraform Outputs (DEV)
         working-directory: infra
         run: |
           echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
@@ -80,7 +79,7 @@ jobs:
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
       # ---------------------------
-      # Build & Push Docker Image (DEV)
+      # Docker Build & Push (DEV)
       # ---------------------------
       - name: Login to ACR (DEV)
         run: az acr login --name "$ACR_NAME"
@@ -96,7 +95,7 @@ jobs:
           docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
 
       # ---------------------------
-      # Restart Web App (DEV)
+      # Restart & Health Check (DEV)
       # ---------------------------
       - name: Restart Web App (DEV)
         run: |
@@ -111,14 +110,18 @@ jobs:
         run: |
           curl -f https://${WEBAPP_NAME}.azurewebsites.net/health
 
-# =========================================================
+# =====================================================
 # PROD DEPLOYMENT (APPROVAL REQUIRED)
-# =========================================================
+# =====================================================
   deploy_prod:
     name: Deploy to PROD
     needs: deploy_dev
     runs-on: ubuntu-latest
-    environment: prod   # 🔒 Approval gate here
+    environment: prod   # 🔒 approval gate here
+
+    # ⭐ CRITICAL
+    env:
+      TF_WORKSPACE: prod
 
     steps:
       # ---------------------------
@@ -156,11 +159,6 @@ jobs:
         working-directory: infra
         run: terraform init -upgrade
 
-      - name: Select PROD Workspace
-        working-directory: infra
-        run: |
-          terraform workspace select prod || terraform workspace new prod
-
       - name: Terraform Plan (PROD)
         working-directory: infra
         run: terraform plan
@@ -172,7 +170,7 @@ jobs:
       # ---------------------------
       # Export Terraform Outputs
       # ---------------------------
-      - name: Export PROD Terraform Outputs
+      - name: Export Terraform Outputs (PROD)
         working-directory: infra
         run: |
           echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
@@ -181,7 +179,7 @@ jobs:
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
       # ---------------------------
-      # Build & Push Docker Image (PROD)
+      # Docker Build & Push (PROD)
       # ---------------------------
       - name: Login to ACR (PROD)
         run: az acr login --name "$ACR_NAME"
@@ -197,7 +195,7 @@ jobs:
           docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
 
       # ---------------------------
-      # Restart Web App (PROD)
+      # Restart & Health Check (PROD)
       # ---------------------------
       - name: Restart Web App (PROD)
         run: |
