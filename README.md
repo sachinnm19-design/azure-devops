@@ -125,15 +125,15 @@ Each workspace represents a separate environment.
 
 #### Terraform Variables (per workspace)
 
-| Variable Name | Example Value |
-|--------------|---------------|
-| location | uksouth |
-| resource_group_name | devops-demo-rg |
-| acr_name | devopsdemoacr1234 |
-| app_service_plan | devops-demo-asp |
-| webapp_name | devops-demo-webapp |
-| image_name | demo-app |
-| image_tag | latest |
+| Variable Name |
+|--------------|
+| location |
+| resource_group_name |
+| acr_name |
+| app_service_plan |
+| webapp_name |
+| image_name |
+| image_tag |
 
 > These values can differ between DEV and PROD.
 
