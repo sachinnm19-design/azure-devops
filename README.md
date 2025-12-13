@@ -52,25 +52,7 @@ Terraform state and environment separation are handled using Terraform Cloud wor
 │ ├── pr-validation.yml
 │ └── cd-dev-prod.yml
 │
-└── README.md
-
-├── app/
-│ ├── app.py / index.js
-│ ├── requirements.txt / package.json
-│ └── Dockerfile
-│
-├── infra/
-│ ├── main.tf # Azure resources
-│ ├── provider.tf # Providers & backend configuration
-│ ├── variables.tf # Input variables
-│ └── outputs.tf # Output values
-│
-├── .github/
-│ └── workflows/
-│ ├── pr-validation.yml
-│ └── cd-dev-prod.yml
-│
-└── README.md
+└── README.md```
 
 
 ---
