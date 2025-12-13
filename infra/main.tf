@@ -45,8 +45,4 @@ resource "azurerm_linux_web_app" "webapp" {
 
   https_only = true
 
-  depends_on = [
-    azurerm_container_registry.acr,
-    azurerm_service_plan.asp
-  ]
 }
