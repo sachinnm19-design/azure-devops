@@ -8,15 +8,22 @@ terraform {
     }
   }
 
+  # Terraform Cloud remote state + runs
   backend "remote" {
     organization = "AzureDevOpsDemo"
 
     workspaces {
-      name = "devops-demo"
+      prefix = "devops-demo-"
     }
   }
 }
 
 provider "azurerm" {
   features {}
+
+  # Service Principal auth (required for Terraform Cloud remote execution)
+  subscription_id = var.subscription_id
+  tenant_id       = var.tenant_id
+  client_id       = var.client_id
+  client_secret   = var.client_secret
 }
