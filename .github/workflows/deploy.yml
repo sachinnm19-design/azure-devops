@@ -1,0 +1,73 @@
+name: CD – Deploy Infra & App
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: demo-app
+  IMAGE_TAG: latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production   # <-- GitHub Environment (adds approval gate)
+
+    concurrency:
+      group: prod-deploy
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure Terraform Cloud Token
+        run: |
+          echo 'credentials "app.terraform.io" { token = "${{ secrets.TF_API_TOKEN }}" }' > ~/.terraformrc
+
+      - name: Terraform Init
+        working-directory: ./infra
+        run: terraform init -upgrade
+
+      - name: Terraform Apply
+        working-directory: ./infra
+        run: terraform apply -auto-approve
+
+      - name: Export Terraform Outputs
+        working-directory: ./infra
+        run: |
+          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
+          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
+          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP_NAME=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
+
+      - name: Login to ACR
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Build Docker Image
+        run: docker build -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} ./app
+
+      - name: Push Docker Image
+        run: docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Restart Azure Web App
+        run: |
+          az webapp restart \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RESOURCE_GROUP_NAME"
+
+      - name: Verify Application Health
+        run: |
+          sleep 120
+          curl -f https://${WEBAPP_NAME}.azurewebsites.net/health
