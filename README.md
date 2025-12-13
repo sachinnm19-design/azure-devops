@@ -66,7 +66,6 @@ Terraform state and environment separation are handled using Terraform Cloud wor
     ```
     GET /health
     Response: { "status": "ok" }
-```
 
 - Application listens on port **3000**
 - Dockerized using a standard Dockerfile
