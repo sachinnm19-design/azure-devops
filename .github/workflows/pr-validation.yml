@@ -9,24 +9,18 @@ jobs:
   pr-validate:
     runs-on: ubuntu-latest
 
+    env:
+      TF_WORKSPACE: dev   # ⭐ CRITICAL FIX
+
     steps:
-      # -----------------------------------
-      # Checkout Code
-      # -----------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------------
-      # Azure Login (needed for Terraform plan)
-      # -----------------------------------
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # -----------------------------------
-      # Terraform Setup
-      # -----------------------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -38,25 +32,14 @@ jobs:
           }
           EOF
 
-      # -----------------------------------
-      # Terraform Init + Plan (DEV only)
-      # -----------------------------------
+      # ✅ Now init knows which workspace to use
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
-
-      # ✅ IMPORTANT: Explicit workspace selection to avoid prompt
-      - name: Select DEV Workspace
-        working-directory: infra
-        run: terraform workspace select dev
 
       - name: Terraform Plan (DEV)
         working-directory: infra
         run: terraform plan
 
-      # -----------------------------------
-      # Docker Build Validation
-      # -----------------------------------
       - name: Docker Build Validation
-        run: |
-          docker build -t pr-validate ./app
+        run: docker build -t pr-validate ./app
