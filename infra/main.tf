@@ -1,50 +1,29 @@
-# ---------------------------
-# Resource Group
-# ---------------------------
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
+
+  tags = {
+    environment = var.environment
+  }
 }
 
-
-# ---------------------------
-# Azure Container Registry
-# ---------------------------
 resource "azurerm_container_registry" "acr" {
   name                = var.acr_name
   resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  location            = var.location
   sku                 = "Basic"
-
-  # For Managed Identity authentication, admin creds must be disabled
-  admin_enabled = true
-
-  depends_on = [
-    azurerm_resource_group.rg
-  ]
+  admin_enabled       = true
 }
 
-
-# ---------------------------
-# App Service Plan (Linux)
-# ---------------------------
 resource "azurerm_service_plan" "asp" {
-  name                = var.app_service_plan
+  name                = var.app_service_plan_name
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
 
   os_type  = "Linux"
-  sku_name = "S1"  # Use S1; B1 sometimes fails in UK South due to capacity issues
-
-  depends_on = [
-    azurerm_resource_group.rg
-  ]
+  sku_name = var.sku_name
 }
 
-
-# ---------------------------
-# Web App for Containers
-# ---------------------------
 resource "azurerm_linux_web_app" "webapp" {
   name                = var.webapp_name
   resource_group_name = azurerm_resource_group.rg.name
@@ -53,10 +32,10 @@ resource "azurerm_linux_web_app" "webapp" {
 
   site_config {
     application_stack {
-      docker_image_name     = "${var.image_name}:${var.image_tag}"
-      docker_registry_url = "https://${azurerm_container_registry.acr.login_server}"
-	  docker_registry_username = "${azurerm_container_registry.acr.admin_username}"
-	  docker_registry_password = "${azurerm_container_registry.acr.admin_password}"
+      docker_image_name        = "${azurerm_container_registry.acr.login_server}/${var.image_name}:${var.image_tag}"
+      docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
+      docker_registry_username = azurerm_container_registry.acr.admin_username
+      docker_registry_password = azurerm_container_registry.acr.admin_password
     }
   }
 
@@ -67,7 +46,7 @@ resource "azurerm_linux_web_app" "webapp" {
   https_only = true
 
   depends_on = [
-    azurerm_service_plan.asp,
-    azurerm_container_registry.acr
+    azurerm_container_registry.acr,
+    azurerm_service_plan.asp
   ]
 }
