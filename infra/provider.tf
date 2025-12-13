@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "remote" {
-    organization = "MyDevopsDemo"
+    organization = "AzureDevOpsDemo"
 
     workspaces {
       name = "devops-demo"
