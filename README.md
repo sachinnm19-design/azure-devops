@@ -1,6 +1,6 @@
 # DevOps Take-Home Assignment – Terraform, Azure, and GitHub Actions
 
-This repo demonstrates a simple DevOps workflow:
+This repo demonstrates a my simple DevOps workflow:
 
 - Infrastructure as Code using **Terraform**
 - Containerized **Python Flask** application
