@@ -1,27 +1,21 @@
-variable "location" {
-  default = "uksouth"
-}
+variable "environment" { type = string }
+variable "location" { type = string }
 
-variable "resource_group_name" {
-  default = "devops-demo-rg"
-}
+variable "resource_group_name" { type = string }
+variable "acr_name" { type = string }
+variable "app_service_plan_name" { type = string }
+variable "webapp_name" { type = string }
 
-variable "acr_name" {
-  default = "devopsdemoacr9999" # MUST BE UNIQUE
-}
+variable "sku_name" { type = string }
 
-variable "app_service_plan" {
-  default = "devops-demo-asp"
-}
+variable "image_name" { type = string }
+variable "image_tag" { type = string }
 
-variable "webapp_name" {
-  default = "devops-demo-webapp9999" # MUST BE UNIQUE
-}
-
-variable "image_name" {
-  default = "demo-app"
-}
-
-variable "image_tag" {
-  default = "latest"
+# Auth (Terraform Cloud workspace variables)
+variable "subscription_id" { type = string }
+variable "tenant_id" { type = string }
+variable "client_id" { type = string }
+variable "client_secret" {
+  type      = string
+  sensitive = true
 }
