@@ -5,10 +5,47 @@ on:
     branches: [ "main" ]
 
 jobs:
-  validate:
+  terraform-plan:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Docker build validation
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure Terraform Cloud Token
+        run: |
+          cat > ~/.terraformrc <<'EOF'
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOF
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init -upgrade
+
+      - name: Select Dev Workspace
+        working-directory: infra
+        run: |
+          terraform workspace select dev || terraform workspace new dev
+
+      # ✅ THIS IS THE MISSING PIECE
+      - name: Terraform Plan (Dev)
+        working-directory: infra
+        run: terraform plan
+
+  docker-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Build Validation
         run: docker build -t pr-validate ./app
