@@ -1,30 +1,23 @@
-name: CD – Deploy Infra & App
+name: CD – Dev Auto → Prod Approval
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: demo-app
   IMAGE_TAG: latest
 
 jobs:
-  deploy:
+  deploy_dev:
     runs-on: ubuntu-latest
-
-    environment:
-      name: production   # <-- GitHub Environment (adds approval gate)
-
-    concurrency:
-      group: prod-deploy
-      cancel-in-progress: true
+    environment: dev
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Login to Azure
+      - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -34,40 +27,114 @@ jobs:
 
       - name: Configure Terraform Cloud Token
         run: |
-          echo 'credentials "app.terraform.io" { token = "${{ secrets.TF_API_TOKEN }}" }' > ~/.terraformrc
+          cat > ~/.terraformrc <<'EOF'
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOF
 
       - name: Terraform Init
-        working-directory: ./infra
+        working-directory: infra
         run: terraform init -upgrade
 
-      - name: Terraform Apply
-        working-directory: ./infra
+      - name: Select Dev Workspace
+        working-directory: infra
+        run: |
+          terraform workspace select dev || terraform workspace new dev
+
+      - name: Terraform Apply (Dev)
+        working-directory: infra
         run: terraform apply -auto-approve
 
-      - name: Export Terraform Outputs
-        working-directory: ./infra
+      - name: Export Dev Outputs
+        working-directory: infra
         run: |
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
           echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
+          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP_NAME=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: Login to ACR
+      - name: Login to ACR (Dev)
         run: az acr login --name "$ACR_NAME"
 
-      - name: Build Docker Image
-        run: docker build -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} ./app
+      - name: Build & Push Image (Dev)
+        run: |
+          docker build -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} ./app
+          docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
 
-      - name: Push Docker Image
-        run: docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
-
-      - name: Restart Azure Web App
+      - name: Restart Web App (Dev)
         run: |
           az webapp restart \
             --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP_NAME"
+            --resource-group "$RESOURCE_GROUP"
 
-      - name: Verify Application Health
+      - name: Wait for startup (Dev)
+        run: sleep 90
+
+      - name: Health Check (Dev)
+        run: curl -f https://${WEBAPP_NAME}.azurewebsites.net/health
+
+  deploy_prod:
+    needs: deploy_dev
+    runs-on: ubuntu-latest
+    environment: prod  # ✅ approval gate happens here
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure Terraform Cloud Token
         run: |
-          sleep 120
-          curl -f https://${WEBAPP_NAME}.azurewebsites.net/health
+          cat > ~/.terraformrc <<'EOF'
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOF
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init -upgrade
+
+      - name: Select Prod Workspace
+        working-directory: infra
+        run: |
+          terraform workspace select prod || terraform workspace new prod
+
+      - name: Terraform Apply (Prod)
+        working-directory: infra
+        run: terraform apply -auto-approve
+
+      - name: Export Prod Outputs
+        working-directory: infra
+        run: |
+          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
+          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
+          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
+
+      - name: Login to ACR (Prod)
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Build & Push Image (Prod)
+        run: |
+          docker build -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} ./app
+          docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Restart Web App (Prod)
+        run: |
+          az webapp restart \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RESOURCE_GROUP"
+
+      - name: Wait for startup (Prod)
+        run: sleep 120
+
+      - name: Health Check (Prod)
+        run: curl -f https://${WEBAPP_NAME}.azurewebsites.net/health
