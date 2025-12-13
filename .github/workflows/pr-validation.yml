@@ -2,20 +2,31 @@ name: CI – PR Validation
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
-  terraform-plan:
+  pr-validate:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # -----------------------------------
+      # Checkout Code
+      # -----------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Azure Login
+      # -----------------------------------
+      # Azure Login (needed for Terraform plan)
+      # -----------------------------------
+      - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # -----------------------------------
+      # Terraform Setup
+      # -----------------------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -27,25 +38,25 @@ jobs:
           }
           EOF
 
+      # -----------------------------------
+      # Terraform Init + Plan (DEV only)
+      # -----------------------------------
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
 
-      - name: Select Dev Workspace
+      # ✅ IMPORTANT: Explicit workspace selection to avoid prompt
+      - name: Select DEV Workspace
         working-directory: infra
-        run: |
-          terraform workspace select dev || terraform workspace new dev
+        run: terraform workspace select dev
 
-      # ✅ THIS IS THE MISSING PIECE
-      - name: Terraform Plan (Dev)
+      - name: Terraform Plan (DEV)
         working-directory: infra
         run: terraform plan
 
-  docker-validate:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
+      # -----------------------------------
+      # Docker Build Validation
+      # -----------------------------------
       - name: Docker Build Validation
-        run: docker build -t pr-validate ./app
+        run: |
+          docker build -t pr-validate ./app
