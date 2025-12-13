@@ -3,7 +3,7 @@ name: CD – Deploy Infra & App
 on:
   push:
     branches:
-      - main
+      - main1
 
 env:
   IMAGE_NAME: demo-app
