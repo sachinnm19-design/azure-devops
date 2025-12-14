@@ -30,7 +30,7 @@ resource "azurerm_linux_web_app" "webapp" {
   location            = var.location
   service_plan_id     = azurerm_service_plan.asp.id
 
-  # Enable managed identity
+  # Enable Managed Identity
   identity {
     type = "SystemAssigned"
   }
@@ -49,9 +49,9 @@ resource "azurerm_linux_web_app" "webapp" {
   https_only = true
 }
 
-# Grant the Managed Identity access to pull images from ACR
+# Grant the Managed Identity access to pull images from ACR 
 resource "azurerm_role_assignment" "acr_pull" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_linux_web_app.webapp.identity.principal_id
+  principal_id         = azurerm_linux_web_app.webapp.identity[0].principal_id
 }
