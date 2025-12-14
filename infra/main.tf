@@ -58,6 +58,25 @@ resource "azurerm_linux_web_app" "webapp" {
   https_only = true
 }
 
+# Step 2: Create the Access Policy for the Web App's Managed Identity
+resource "azurerm_key_vault_access_policy" "webapp" {
+  depends_on = [azurerm_linux_web_app.webapp] # Ensure the webapp is created first
 
+  key_vault_id = azurerm_key_vault.kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id # Dynamically fetch the object_id of the Web App's identity
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
+}
+
+resource "azurerm_role_assignment" "acr_pull_webapp" {
+  depends_on = [azurerm_linux_web_app.webapp] # Ensure the webapp is created first
+  scope                = azurerm_container_registry.acr.id # Assign permissions at the ACR level
+  role_definition_name = "AcrPull"                         # Provide the AcrPull role
+  principal_id         = azurerm_linux_web_app.webapp.identity[0].principal_id # Use Web App’s Managed Identity
+}
 
 data "azurerm_client_config" "current" {}
