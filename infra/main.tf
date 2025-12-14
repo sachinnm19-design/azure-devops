@@ -41,10 +41,6 @@ resource "azurerm_linux_web_app" "webapp" {
   location            = var.location
   service_plan_id     = azurerm_service_plan.asp.id
 
-  identity {
-    type = "SystemAssigned" # This enables a system-assigned Managed Identity
-  }
-
   site_config {
     application_stack {
       docker_image_name        = "${var.image_name}:${var.image_tag}"
@@ -62,18 +58,6 @@ resource "azurerm_linux_web_app" "webapp" {
   https_only = true
 }
 
-# Step 2: Create the Access Policy for the Web App's Managed Identity
-resource "azurerm_key_vault_access_policy" "webapp" {
-  depends_on = [azurerm_linux_web_app.webapp] # Ensure the webapp is created first
 
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id # Dynamically fetch the object_id of the Web App's identity
-
-  secret_permissions = [
-    "Get",
-    "List"
-  ]
-}
 
 data "azurerm_client_config" "current" {}
