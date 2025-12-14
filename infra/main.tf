@@ -16,13 +16,11 @@ resource "azurerm_container_registry" "acr" {
 }
 
 resource "azurerm_key_vault" "kv" {
-  name                = "${var.acr_name}-kv"
+  name                = var.key_vault_name
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   sku_name            = "standard"
   tenant_id           = data.azurerm_client_config.current.tenant_id
-
-  # Access policies will allow the web app's managed identity to access secrets
 }
 
 resource "azurerm_key_vault_secret" "acr_username" {
@@ -35,6 +33,18 @@ resource "azurerm_key_vault_secret" "acr_password" {
   name         = "acr-admin-password"
   value        = azurerm_container_registry.acr.admin_password
   key_vault_id = azurerm_key_vault.kv.id
+}
+
+# Grant WebApp Managed Identity Access to the Key Vault
+resource "azurerm_key_vault_access_policy" "webapp" {
+  key_vault_id = azurerm_key_vault.kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
 }
 
 resource "azurerm_service_plan" "asp" {
@@ -68,8 +78,6 @@ resource "azurerm_linux_web_app" "webapp" {
 
   app_settings = {
     WEBSITES_PORT = "3000"
-    # Setting up the KeyVault Reference Resolver
-    "AzureWebJobsSecretStorageType" = "keyvault"
   }
 
   https_only = true
