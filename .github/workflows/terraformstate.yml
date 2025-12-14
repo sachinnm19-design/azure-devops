@@ -1,7 +1,7 @@
 name: Terraform Import Pipeline (devops-demo-dev workspace)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Allow manual execution of the pipeline
 
 jobs:
   terraform-import:
@@ -18,12 +18,13 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }} # Terraform Cloud API Token
 
-      # Step 3: Terraform Init - Configure devops-demo-dev Workspace
-      - name: Initialize Terraform
-        run: terraform -chdir=infra init
-          # Change to the 'infra' directory (where .tf files are located)
+      # Step 3: Terraform Init - Initialize devops-demo-dev Workspace
+      - name: Initialize Terraform in devops-demo-dev Workspace
+        run: |
+          terraform -chdir=infra init
+          terraform -chdir=infra workspace select devops-demo-dev || terraform -chdir=infra workspace new devops-demo-dev
 
       # Step 4: Import acr-admin-username Secret
       - name: Import acr-admin-username Secret
@@ -37,8 +38,8 @@ jobs:
       - name: Import Key Vault Access Policy for Terraform SPN
         run: terraform -chdir=infra import azurerm_key_vault_access_policy.terraform_spn_access "/subscriptions/2a928c46-6cd4-4724-9130-23e5b377e526/resourceGroups/rg-devops-demo-dev/providers/Microsoft.KeyVault/vaults/devopsdemoacrdev1234-kv/objectId/24925e59-0998-4fde-8495-3a54375020c5"
 
-      # Step 7: Verify State
-      - name: Verify Terraform State
+      # Step 7: Verify Terraform State
+      - name: Verify Imported State
         run: terraform -chdir=infra state list
 
       # Step 8: Plan for Verification
