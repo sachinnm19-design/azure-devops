@@ -45,22 +45,6 @@ resource "azurerm_key_vault_secret" "acr_password" {
   ]
 }
 
-resource "azurerm_key_vault_access_policy" "webapp" {
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = var.sp_object_id # WebApp Managed Identity
-
-  secret_permissions = [
-    "Get",
-    "List"
-  ]
-
-  depends_on = [
-    azurerm_key_vault_secret.acr_username,
-    azurerm_key_vault_secret.acr_password
-  ]
-}
-
 resource "azurerm_service_plan" "asp" {
   name                = var.app_service_plan_name
   resource_group_name = azurerm_resource_group.rg.name
