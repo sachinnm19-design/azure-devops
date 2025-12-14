@@ -41,10 +41,6 @@ resource "azurerm_linux_web_app" "webapp" {
   location            = var.location
   service_plan_id     = azurerm_service_plan.asp.id
 
-  identity {
-    type = "SystemAssigned" # This enables a system-assigned Managed Identity
-  }
-
   site_config {
     application_stack {
       docker_image_name        = "${var.image_name}:${var.image_tag}"
