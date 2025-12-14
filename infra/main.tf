@@ -100,7 +100,3 @@ resource "azurerm_linux_web_app" "webapp" {
 }
 
 data "azurerm_client_config" "current" {}
-
-variable "sp_object_id" {
-  description = "Object ID of the Service Principal used by Terraform"
-}
