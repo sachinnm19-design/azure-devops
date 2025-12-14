@@ -49,9 +49,12 @@ resource "azurerm_linux_web_app" "webapp" {
   https_only = true
 }
 
-# Grant the Managed Identity access to pull images from ACR 
+# Grant the Managed Identity access to ACR
 resource "azurerm_role_assignment" "acr_pull" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_linux_web_app.webapp.identity[0].principal_id
+
+  # Use dynamic principal_id of the managed identity
+  principal_id = azurerm_linux_web_app.webapp.identity[0].principal_id
+  depends_on = [azurerm_linux_web_app.webapp] # Ensure dependencies resolve correctly
 }
