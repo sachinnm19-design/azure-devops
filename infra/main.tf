@@ -16,7 +16,7 @@ resource "azurerm_container_registry" "acr" {
 }
 
 resource "azurerm_key_vault" "kv" {
-  name                = "${var.key_vault_name}-dev-${timestamp()}"
+  name                = var.key_vault_name
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   sku_name            = "standard"
