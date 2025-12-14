@@ -58,3 +58,6 @@ variable "key_vault_access_policy" {
   default = []
   description = "A list of access policies specifying the object IDs and permissions for users or components accessing the Azure Key Vault."
 }
+variable "sp_object_id" {
+  description = "Object ID of the Service Principal used by Terraform"
+}
