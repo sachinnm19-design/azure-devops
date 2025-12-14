@@ -21,10 +21,10 @@ jobs:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }} # Terraform Cloud API Token
 
       # Step 3: Terraform Init - Configure devops-demo-dev Workspace
-      - name: Initialize Terraform (devops-demo-dev Workspace)
-        run: terraform init \
-          -backend-config="organization=AzureDevOpsDemo" \
-          -backend-config="workspace=devops-demo-dev"
+      - name: Initialize Terraform
+        run: |
+          terraform init
+          terraform workspace select devops-demo-dev || terraform workspace new devops-demo-dev
 
       # Step 4: Import acr-admin-username Secret
       - name: Import acr-admin-username Secret
