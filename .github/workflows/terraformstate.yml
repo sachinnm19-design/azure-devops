@@ -1,7 +1,7 @@
 name: Terraform Import Pipeline (devops-demo-dev workspace)
 
 on:
-  workflow_dispatch: # Allow manual execution of the pipeline
+  workflow_dispatch:
 
 jobs:
   terraform-import:
@@ -18,28 +18,29 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }} # Terraform Cloud API Token
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       # Step 3: Terraform Init - Configure devops-demo-dev Workspace
-      - name: Initialize Terraform (devops-demo-dev Workspace)
-        run: terraform init
+      - name: Initialize Terraform
+        run: terraform -chdir=infra init
+          # Change to the 'infra' directory (where .tf files are located)
 
       # Step 4: Import acr-admin-username Secret
       - name: Import acr-admin-username Secret
-        run: terraform import azurerm_key_vault_secret.acr_username "https://devopsdemoacrdev1234-kv.vault.azure.net/secrets/acr-admin-username/a78867edb46d4758ac3c941d7f2d0767"
+        run: terraform -chdir=infra import azurerm_key_vault_secret.acr_username "https://devopsdemoacrdev1234-kv.vault.azure.net/secrets/acr-admin-username/a78867edb46d4758ac3c941d7f2d0767"
 
       # Step 5: Import acr-admin-password Secret
       - name: Import acr-admin-password Secret
-        run: terraform import azurerm_key_vault_secret.acr_password "https://devopsdemoacrdev1234-kv.vault.azure.net/secrets/acr-admin-password/28ef64233ffe4a428b04dd99ec467c9f"
+        run: terraform -chdir=infra import azurerm_key_vault_secret.acr_password "https://devopsdemoacrdev1234-kv.vault.azure.net/secrets/acr-admin-password/28ef64233ffe4a428b04dd99ec467c9f"
 
       # Step 6: Import Key Vault SPN Access Policy
       - name: Import Key Vault Access Policy for Terraform SPN
-        run: terraform import azurerm_key_vault_access_policy.terraform_spn_access "/subscriptions/2a928c46-6cd4-4724-9130-23e5b377e526/resourceGroups/rg-devops-demo-dev/providers/Microsoft.KeyVault/vaults/devopsdemoacrdev1234-kv/objectId/24925e59-0998-4fde-8495-3a54375020c5"
+        run: terraform -chdir=infra import azurerm_key_vault_access_policy.terraform_spn_access "/subscriptions/2a928c46-6cd4-4724-9130-23e5b377e526/resourceGroups/rg-devops-demo-dev/providers/Microsoft.KeyVault/vaults/devopsdemoacrdev1234-kv/objectId/24925e59-0998-4fde-8495-3a54375020c5"
 
       # Step 7: Verify State
       - name: Verify Terraform State
-        run: terraform state list
+        run: terraform -chdir=infra state list
 
       # Step 8: Plan for Verification
       - name: Terraform Plan
-        run: terraform plan
+        run: terraform -chdir=infra plan
