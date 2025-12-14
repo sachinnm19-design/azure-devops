@@ -13,7 +13,7 @@ terraform {
     organization = "AzureDevOpsDemo"
 
     workspaces {
-      prefix = "devops-demo-"
+      prefix = "devops-demo-dev"
     }
   }
 }
