@@ -80,6 +80,11 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   https_only = true
+  
+  depends_on = [
+    azurerm_key_vault_secret.acr_username,
+    azurerm_key_vault_secret.acr_password
+  ]
 }
 
 data "azurerm_client_config" "current" {}
