@@ -22,9 +22,7 @@ jobs:
 
       # Step 3: Terraform Init - Configure devops-demo-dev Workspace
       - name: Initialize Terraform (devops-demo-dev Workspace)
-        run: terraform init \
-          -backend-config="organization=AzureDevOpsDemo" \
-          -backend-config="workspace=devops-demo-dev"
+        run: terraform init
 
       # Step 4: Import acr-admin-username Secret
       - name: Import acr-admin-username Secret
