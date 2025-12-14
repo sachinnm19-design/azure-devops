@@ -13,6 +13,10 @@ resource "azurerm_container_registry" "acr" {
   location            = var.location
   sku                 = "Basic"
   admin_enabled       = true
+
+  depends_on = [
+    azurerm_resource_group.rg
+  ]
 }
 
 resource "azurerm_key_vault" "kv" {
@@ -22,19 +26,29 @@ resource "azurerm_key_vault" "kv" {
   sku_name            = "standard"
   tenant_id           = data.azurerm_client_config.current.tenant_id
 
-  # Access policies will allow the web app's managed identity to access secrets
+  depends_on = [
+    azurerm_container_registry.acr
+  ]
 }
 
 resource "azurerm_key_vault_secret" "acr_username" {
   name         = "acr-admin-username"
   value        = azurerm_container_registry.acr.admin_username
   key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [
+    azurerm_key_vault.kv
+  ]
 }
 
 resource "azurerm_key_vault_secret" "acr_password" {
   name         = "acr-admin-password"
   value        = azurerm_container_registry.acr.admin_password
   key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [
+    azurerm_key_vault.kv
+  ]
 }
 
 resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
@@ -48,6 +62,10 @@ resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
     "Set",
     "Delete"
   ]
+
+  depends_on = [
+    azurerm_key_vault.kv
+  ]
 }
 
 resource "azurerm_key_vault_access_policy" "webapp" {
@@ -59,6 +77,11 @@ resource "azurerm_key_vault_access_policy" "webapp" {
     "Get",
     "List"
   ]
+
+  depends_on = [
+    azurerm_key_vault.kv,
+    azurerm_linux_web_app.webapp
+  ]
 }
 
 resource "azurerm_service_plan" "asp" {
@@ -68,6 +91,10 @@ resource "azurerm_service_plan" "asp" {
 
   os_type  = "Linux"
   sku_name = var.sku_name
+
+  depends_on = [
+    azurerm_resource_group.rg
+  ]
 }
 
 resource "azurerm_linux_web_app" "webapp" {
@@ -97,6 +124,11 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   https_only = true
+
+  depends_on = [
+    azurerm_key_vault_secret.acr_username,
+    azurerm_key_vault_secret.acr_password
+  ]
 }
 
 data "azurerm_client_config" "current" {}
