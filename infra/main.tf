@@ -12,7 +12,7 @@ resource "azurerm_container_registry" "acr" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   sku                 = "Basic"
-  admin_enabled       = true
+  admin_enabled       = false  # Disable admin credentials for better security
 }
 
 resource "azurerm_service_plan" "asp" {
@@ -30,7 +30,7 @@ resource "azurerm_linux_web_app" "webapp" {
   location            = var.location
   service_plan_id     = azurerm_service_plan.asp.id
 
-  # Enable Managed Identity
+  # Enable managed identity
   identity {
     type = "SystemAssigned"
   }
@@ -53,5 +53,5 @@ resource "azurerm_linux_web_app" "webapp" {
 resource "azurerm_role_assignment" "acr_pull" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_linux_web_app.webapp.identity[0].principal_id
+  principal_id         = azurerm_linux_web_app.webapp.identity.principal_id
 }
