@@ -25,26 +25,6 @@ resource "azurerm_key_vault" "kv" {
   depends_on = [azurerm_container_registry.acr]
 }
 
-resource "azurerm_key_vault_secret" "acr_username" {
-  name         = "acr-admin-username"
-  value        = azurerm_container_registry.acr.admin_username
-  key_vault_id = azurerm_key_vault.kv.id
-
-  depends_on = [
-    azurerm_container_registry.acr
-  ]
-}
-
-resource "azurerm_key_vault_secret" "acr_password" {
-  name         = "acr-admin-password"
-  value        = azurerm_container_registry.acr.admin_password
-  key_vault_id = azurerm_key_vault.kv.id
-
-  depends_on = [
-    azurerm_container_registry.acr
-  ]
-}
-
 resource "azurerm_service_plan" "asp" {
   name                = var.app_service_plan_name
   resource_group_name = azurerm_resource_group.rg.name
@@ -80,11 +60,7 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   https_only = true
-  
-  depends_on = [
-    azurerm_key_vault_secret.acr_username,
-    azurerm_key_vault_secret.acr_password
-  ]
+
 }
 
 data "azurerm_client_config" "current" {}
