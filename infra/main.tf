@@ -13,10 +13,6 @@ resource "azurerm_container_registry" "acr" {
   location            = var.location
   sku                 = "Basic"
   admin_enabled       = true
-
-  depends_on = [
-    azurerm_resource_group.rg
-  ]
 }
 
 resource "azurerm_key_vault" "kv" {
@@ -26,29 +22,7 @@ resource "azurerm_key_vault" "kv" {
   sku_name            = "standard"
   tenant_id           = data.azurerm_client_config.current.tenant_id
 
-  depends_on = [
-    azurerm_container_registry.acr
-  ]
-}
-
-resource "azurerm_key_vault_secret" "acr_username" {
-  name         = "acr-admin-username"
-  value        = azurerm_container_registry.acr.admin_username
-  key_vault_id = azurerm_key_vault.kv.id
-
-  depends_on = [
-    azurerm_key_vault.kv
-  ]
-}
-
-resource "azurerm_key_vault_secret" "acr_password" {
-  name         = "acr-admin-password"
-  value        = azurerm_container_registry.acr.admin_password
-  key_vault_id = azurerm_key_vault.kv.id
-
-  depends_on = [
-    azurerm_key_vault.kv
-  ]
+  depends_on = [azurerm_container_registry.acr]
 }
 
 resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
@@ -63,15 +37,35 @@ resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
     "Delete"
   ]
 
+  depends_on = [azurerm_key_vault.kv]
+}
+
+resource "azurerm_key_vault_secret" "acr_username" {
+  name         = "acr-admin-username"
+  value        = azurerm_container_registry.acr.admin_username
+  key_vault_id = azurerm_key_vault.kv.id
+
   depends_on = [
-    azurerm_key_vault.kv
+    azurerm_key_vault_access_policy.terraform_spn_access,
+    azurerm_container_registry.acr
+  ]
+}
+
+resource "azurerm_key_vault_secret" "acr_password" {
+  name         = "acr-admin-password"
+  value        = azurerm_container_registry.acr.admin_password
+  key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform_spn_access,
+    azurerm_container_registry.acr
   ]
 }
 
 resource "azurerm_key_vault_access_policy" "webapp" {
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id # WebApp Managed Identity
+  object_id    = var.sp_object_id # WebApp Managed Identity
 
   secret_permissions = [
     "Get",
@@ -79,8 +73,8 @@ resource "azurerm_key_vault_access_policy" "webapp" {
   ]
 
   depends_on = [
-    azurerm_key_vault.kv,
-    azurerm_linux_web_app.webapp
+    azurerm_key_vault_secret.acr_username,
+    azurerm_key_vault_secret.acr_password
   ]
 }
 
@@ -91,10 +85,6 @@ resource "azurerm_service_plan" "asp" {
 
   os_type  = "Linux"
   sku_name = var.sku_name
-
-  depends_on = [
-    azurerm_resource_group.rg
-  ]
 }
 
 resource "azurerm_linux_web_app" "webapp" {
@@ -119,15 +109,13 @@ resource "azurerm_linux_web_app" "webapp" {
 
   app_settings = {
     WEBSITES_PORT = "3000"
-    # Setting up the KeyVault Reference Resolver
     "AzureWebJobsSecretStorageType" = "keyvault"
   }
 
   https_only = true
 
   depends_on = [
-    azurerm_key_vault_secret.acr_username,
-    azurerm_key_vault_secret.acr_password
+    azurerm_key_vault_access_policy.webapp
   ]
 }
 
