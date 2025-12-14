@@ -15,6 +15,28 @@ resource "azurerm_container_registry" "acr" {
   admin_enabled       = true
 }
 
+resource "azurerm_key_vault" "kv" {
+  name                = "${var.acr_name}-kv"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  sku_name            = "standard"
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+
+  # Access policies will allow the web app's managed identity to access secrets
+}
+
+resource "azurerm_key_vault_secret" "acr_username" {
+  name         = "acr-admin-username"
+  value        = azurerm_container_registry.acr.admin_username
+  key_vault_id = azurerm_key_vault.kv.id
+}
+
+resource "azurerm_key_vault_secret" "acr_password" {
+  name         = "acr-admin-password"
+  value        = azurerm_container_registry.acr.admin_password
+  key_vault_id = azurerm_key_vault.kv.id
+}
+
 resource "azurerm_service_plan" "asp" {
   name                = var.app_service_plan_name
   resource_group_name = azurerm_resource_group.rg.name
@@ -30,19 +52,27 @@ resource "azurerm_linux_web_app" "webapp" {
   location            = var.location
   service_plan_id     = azurerm_service_plan.asp.id
 
+  # Enable Managed Identity for the Web App
+  identity {
+    type = "SystemAssigned"
+  }
+
   site_config {
     application_stack {
       docker_image_name        = "${var.image_name}:${var.image_tag}"
       docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
-      docker_registry_username = "${azurerm_container_registry.acr.admin_username}"
-      docker_registry_password = "${azurerm_container_registry.acr.admin_password}"
+      docker_registry_username = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.kv.name};SecretName=acr-admin-username)"
+      docker_registry_password = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.kv.name};SecretName=acr-admin-password)"
     }
   }
 
   app_settings = {
     WEBSITES_PORT = "3000"
+    # Setting up the KeyVault Reference Resolver
+    "AzureWebJobsSecretStorageType" = "keyvault"
   }
 
   https_only = true
-
 }
+
+data "azurerm_client_config" "current" {}
