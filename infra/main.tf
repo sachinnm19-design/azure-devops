@@ -42,8 +42,8 @@ resource "azurerm_key_vault_access_policy" "webapp" {
   object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id
 
   secret_permissions = [
-    "get",
-    "list"
+    "Get",
+    "List"
   ]
 }
 
