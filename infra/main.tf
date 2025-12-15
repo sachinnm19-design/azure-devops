@@ -72,11 +72,5 @@ resource "azurerm_key_vault_access_policy" "webapp" {
   ]
 }
 
-resource "azurerm_role_assignment" "acr_pull_webapp" {
-  depends_on = [azurerm_linux_web_app.webapp] # Ensure the webapp is created first
-  scope                = azurerm_container_registry.acr.id # Assign permissions at the ACR level
-  role_definition_name = "AcrPull"                         # Provide the AcrPull role
-  principal_id         = azurerm_linux_web_app.webapp.identity[0].principal_id # Use Web App’s Managed Identity
-}
 
 data "azurerm_client_config" "current" {}
