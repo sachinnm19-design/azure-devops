@@ -85,8 +85,8 @@ resource "azurerm_linux_web_app" "webapp" {
     application_stack {
       docker_image_name        = "${var.image_name}:${var.image_tag}"
       docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
-      docker_registry_username = "@Microsoft.KeyVault(Secreturi=${azurerm_key_vault_secret.acr_username})"
-      docker_registry_password = "@Microsoft.KeyVault(Secreturi=${azurerm_key_vault_secret.acr_password})"
+      docker_registry_username = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.acr_username.id})"
+      docker_registry_password = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.acr_password.id})"
     }
   }
 
