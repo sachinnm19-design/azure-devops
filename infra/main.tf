@@ -25,13 +25,32 @@ resource "azurerm_key_vault" "kv" {
   depends_on = [azurerm_container_registry.acr]
 }
 
+resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
+  key_vault_id = azurerm_key_vault.kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = var.sp_object_id  # Pass the SPN Object ID to Terraform.
+
+  secret_permissions = [
+    "Get",
+    "List",
+    "Set",
+    "Delete",
+	"Recover"
+  ]
+
+  depends_on = [
+    azurerm_key_vault.kv
+  ]
+}
+
 resource "azurerm_key_vault_secret" "acr_username" {
   name         = "acr-admin-username"
   value        = azurerm_container_registry.acr.admin_username
   key_vault_id = azurerm_key_vault.kv.id
 
   depends_on = [
-    azurerm_container_registry.acr
+    azurerm_container_registry.acr,
+    azurerm_key_vault_access_policy.terraform_spn_access
   ]
 }
 
@@ -41,7 +60,8 @@ resource "azurerm_key_vault_secret" "acr_password" {
   key_vault_id = azurerm_key_vault.kv.id
 
   depends_on = [
-    azurerm_container_registry.acr
+    azurerm_container_registry.acr,
+    azurerm_key_vault_access_policy.terraform_spn_access
   ]
 }
 
