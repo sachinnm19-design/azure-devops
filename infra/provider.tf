@@ -10,7 +10,7 @@ terraform {
 
   # Terraform Cloud remote state + runs
   backend "remote" {
-    organization = "TerraformDevOpsDemo"
+    organization = "DevOpsTerraformOrg"
 
     workspaces {
       prefix = "devops-demo-"
