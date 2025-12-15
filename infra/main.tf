@@ -25,17 +25,27 @@ resource "azurerm_key_vault" "kv" {
   depends_on = [azurerm_container_registry.acr]
 }
 
+resource "azurerm_service_plan" "asp" {
+  name                = var.app_service_plan_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+
+  os_type  = "Linux"
+  sku_name = var.sku_name
+}
+
+# Stage 1: Access Policy for Terraform SPN
 resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = var.sp_object_id  # Pass the SPN Object ID to Terraform.
+  object_id    = var.sp_object_id # Pass the SPN Object ID
 
   secret_permissions = [
     "Get",
     "List",
     "Set",
     "Delete",
-	"Recover"
+    "Recover"
   ]
 
   depends_on = [
@@ -43,13 +53,13 @@ resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
   ]
 }
 
+# Key Vault Secrets
 resource "azurerm_key_vault_secret" "acr_username" {
   name         = "acr-admin-username"
   value        = azurerm_container_registry.acr.admin_username
   key_vault_id = azurerm_key_vault.kv.id
 
   depends_on = [
-    azurerm_container_registry.acr,
     azurerm_key_vault_access_policy.terraform_spn_access
   ]
 }
@@ -60,15 +70,15 @@ resource "azurerm_key_vault_secret" "acr_password" {
   key_vault_id = azurerm_key_vault.kv.id
 
   depends_on = [
-    azurerm_container_registry.acr,
     azurerm_key_vault_access_policy.terraform_spn_access
   ]
 }
 
+# Stage 2: Access Policy for the Web App Managed Identity
 resource "azurerm_key_vault_access_policy" "webapp" {
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = var.sp_object_id # WebApp Managed Identity
+  object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id
 
   secret_permissions = [
     "Get",
@@ -76,20 +86,11 @@ resource "azurerm_key_vault_access_policy" "webapp" {
   ]
 
   depends_on = [
-    azurerm_key_vault_secret.acr_username,
-    azurerm_key_vault_secret.acr_password
+    azurerm_linux_web_app.webapp
   ]
 }
 
-resource "azurerm_service_plan" "asp" {
-  name                = var.app_service_plan_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-
-  os_type  = "Linux"
-  sku_name = var.sku_name
-}
-
+# Azure Linux Web App
 resource "azurerm_linux_web_app" "webapp" {
   name                = var.webapp_name
   resource_group_name = azurerm_resource_group.rg.name
@@ -103,8 +104,8 @@ resource "azurerm_linux_web_app" "webapp" {
 
   site_config {
     application_stack {
-      docker_image_name        = "${var.image_name}:${var.image_tag}"
-      docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
+      docker_image_name   = "${var.image_name}:${var.image_tag}"
+      docker_registry_url = "https://${azurerm_container_registry.acr.login_server}"
       docker_registry_username = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.acr_username.id})"
       docker_registry_password = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.acr_password.id})"
     }
@@ -116,10 +117,6 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   https_only = true
-
-  depends_on = [
-    azurerm_key_vault_access_policy.webapp
-  ]
 }
 
 data "azurerm_client_config" "current" {}
