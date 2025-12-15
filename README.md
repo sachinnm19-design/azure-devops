@@ -7,6 +7,7 @@ This repository demonstrates a complete, production-oriented DevOps workflow usi
 - Terraform for Infrastructure as Code (IaC)
 - Terraform Cloud for remote state management and environment isolation
 - Azure for hosting a containerized application
+- Key Vault for secrets management and secure access
 - GitHub Actions for CI/CD automation
 - Pull Request–based workflow with approvals and environment gates
 
@@ -21,6 +22,7 @@ The solution provisions Azure infrastructure, builds a containerized application
 - Azure Container Registry (ACR)
 - App Service Plan (Linux)
 - Azure Web App for Containers
+- **Azure Key Vault**: Secure storage for sensitive application secrets (e.g., ACR credentials).
 
 ### CI/CD Flow
 1. Developer creates a feature branch and raises a Pull Request
@@ -31,15 +33,17 @@ The solution provisions Azure infrastructure, builds a containerized application
 6. PROD deployment requires manual approval
 
 Terraform state and environment separation are handled using Terraform Cloud workspaces.
+All sensitive credentials are securely stored in Azure Key Vault, eliminating the risk of hardcoding secrets.
 
 ---
+
 ## 3. Repository Structure
 
 ```
 .
 ├── app/
-│ ├── app.py / index.js
-│ ├── requirements.txt / package.json
+│ ├── app.py
+│ ├── requirements.txt
 │ └── Dockerfile
 │
 ├── infra/
@@ -51,22 +55,21 @@ Terraform state and environment separation are handled using Terraform Cloud wor
 ├── .github/
 │ └── workflows/
 │ ├── pr-validation.yml
-│ └── cd-dev-prod.yml
+│ └── deploy.yml
 │
 └── README.md
 ```
-
 
 ---
 
 ## 4. Application Details
 
-- Simple containerized application
+- Simple containerized application using Flask (Python)
 - Exposes a health endpoint:
     ```
     GET /health
     Response: { "status": "ok" }
-
+    ```
 - Application listens on port **3000**
 - Dockerized using a standard Dockerfile
 
@@ -89,157 +92,168 @@ Before setting up this project, ensure you have:
 
 Create a Service Principal with Contributor access:
 
-az ad sp create-for-rbac
---name devops-demo-sp
---role Contributor
---scopes /subscriptions/<SUBSCRIPTION_ID>
---sdk-auth
-
+```bash
+az ad sp create-for-rbac \
+  --name devops-demo-sp \
+  --role Contributor \
+  --scopes /subscriptions/<SUBSCRIPTION_ID> \
+  --sdk-auth
+```
 
 Save the JSON output securely. It will be used in GitHub and Terraform Cloud.
+
+### 6.2 Key Vault Setup
+
+#### 6.2.1 Create Key Vault
+Key Vault is automatically provisioned by Terraform using the configuration in `infra/main.tf`:
+- Key Vault is named dynamically as `<acr_name>-kv` (based on the ACR name).
+- Secrets for ACR credentials (`acr-admin-username`, `acr-admin-password`) are securely populated by Terraform.
+
+#### 6.2.2 Access Policies
+Terraform sets up the Key Vault Access Policies as follows:
+- **Terraform Service Principal:** Full permissions for provisioning and managing secrets.
+- **Web App Managed Identity:** Read-only access (`Get`, `List`) for retrieving secrets at runtime.
+
+To review Access Policies:
+```bash
+az keyvault show --name <key-vault-name> --query properties.accessPolicies
+```
 
 ---
 
 ## 7. Terraform Cloud Setup
 
-### 7.1 Create Organization
-
-- Sign in to https://app.terraform.io
+### 7.1 Create an Organization
+- Sign in to [Terraform Cloud](https://app.terraform.io)
 - Create an organization (example: `AzureDevOpsDemo`)
 
----
-
 ### 7.2 Create Workspaces
-
 Create two workspaces:
 
-| Workspace Name |
-|---------------|
-| devops-demo-dev |
-| devops-demo-prod |
+| Workspace Name       |
+|-----------------------|
+| devops-demo-dev       |
+| devops-demo-prod      |
 
 Each workspace represents a separate environment.
 
----
+### 7.3 Configure Variables
 
-### 7.3 Configure Workspace Variables
+#### Terraform Variables
+| Variable Name         | Description                            |
+|-----------------------|----------------------------------------|
+| location              | Azure region                          |
+| resource_group_name   | Name of the resource group            |
+| acr_name              | Azure Container Registry name         |
+| app_service_plan_name | App Service Plan name                 |
+| webapp_name           | Web App name                          |
+| image_name            | Container image name                 |
+| image_tag             | Version tag for the container image   |
 
-#### Terraform Variables (per workspace)
+#### Environment Variables
+| Variable Name         | Description                            |
+|-----------------------|----------------------------------------|
+| ARM_CLIENT_ID         | Service Principal client ID           |
+| ARM_CLIENT_SECRET     | Service Principal client secret       |
+| ARM_SUBSCRIPTION_ID   | Azure subscription ID                 |
+| ARM_TENANT_ID         | Azure tenant ID                       |
 
-| Variable Name |
-|--------------|
-| location |
-| resource_group_name |
-| acr_name |
-| app_service_plan |
-| webapp_name |
-| image_name |
-| image_tag |
-
-> These values can differ between DEV and PROD.
-
----
-
-#### Environment Variables (per workspace)
-
-| Variable Name |
-|--------------|
-| ARM_CLIENT_ID |
-| ARM_CLIENT_SECRET |
-| ARM_SUBSCRIPTION_ID |
-| ARM_TENANT_ID |
-
-> Mark all as **Sensitive** in Terraform Cloud.
+Mark all environment variables as **Sensitive** in Terraform Cloud.
 
 ---
 
 ## 8. GitHub Repository Setup
 
 ### 8.1 GitHub Secrets
+Add the following secrets to your repository:
 
-Add the following repository secrets:
-
-| Secret Name | Description |
-|------------|-------------|
-| AZURE_CREDENTIALS | Service Principal JSON from Azure |
-| TF_API_TOKEN | Terraform Cloud API token |
+| Secret Name         | Description                             |
+|---------------------|-----------------------------------------|
+| AZURE_CREDENTIALS   | Service Principal JSON from Azure       |
+| TF_API_TOKEN        | Terraform Cloud API token               |
 
 ---
 
 ### 8.2 GitHub Environments
-
-Create two GitHub environments:
-
-| Environment | Approval Required |
-|------------|-------------------|
-| dev | No |
-| prod | Yes |
-
-Production environment requires at least one reviewer approval.
+Create two environments in GitHub:
+| Environment | Requires Approval |
+|-------------|--------------------|
+| dev         | No                |
+| prod        | Yes               |
 
 ---
 
 ## 9. CI/CD Pipelines
 
-### 9.1 CI – Pull Request Validation
-
-Triggered when a Pull Request is raised against the `main` branch.
+### 9.1 CI – PR Validation
+Runs on Pull Requests targeting the `main` branch.
 
 Pipeline steps:
-- Terraform init and plan using DEV workspace
-- Docker image build validation
-- No infrastructure changes applied
-
-This ensures early validation and safe code review.
-
----
+1. **Terraform Plan for DEV**:
+   - Validates infrastructure configuration using DEV workspace.
+2. **Docker Build Validation**:
+   - Ensures containers are built correctly.
 
 ### 9.2 CD – Deployment Pipeline
+Triggered on merges to the `main` branch.
 
-Triggered on merge to the `main` branch.
+#### DEV Deployment Pipeline:
+1. Provisions infrastructure in DEV using Terraform.
+2. Pushes Docker images to Azure Container Registry for DEV.
+3. Deploys containers to a DEV Web App.
 
-#### DEV Deployment
-- Terraform plan and apply
-- Docker image build and push to ACR
-- Azure Web App restart
-- Health check
-
-#### PROD Deployment
-- Manual approval required
-- Terraform plan and apply
-- Docker image build and push
-- Azure Web App restart
-- Health check
+#### PROD Deployment Pipeline:
+1. Waits for manual approval.
+2. Provisions infrastructure in PROD using Terraform.
+3. Pushes Docker images to Azure Container Registry for PROD.
+4. Deploys containers to a PROD Web App.
 
 ---
 
 ## 10. Verification
 
-After deployment, verify the application:
+After deployment, verify the application with the following:
 
-curl https://<webapp-name>.azurewebsites.net/health
+- DEV:
+```bash
+curl https://<dev-webapp-name>.azurewebsites.net/health
+```
+
+- PROD:
+```bash
+curl https://<prod-webapp-name>.azurewebsites.net/health
+```
 
 Expected response:
-
+```json
 { "status": "ok" }
-
+```
 
 ---
 
 ## 11. Design & Best Practices
 
-- Infrastructure fully defined as code
-- No secrets hardcoded
-- Environment isolation using Terraform Cloud workspaces
-- PR-based CI validation
-- Approval-gated production deployments
-- Single Terraform codebase reused across environments
+### Infrastructure
+- Infrastructure is fully defined as code using Terraform.
+- Terraform Cloud is used for remote state management and environment isolation.
+- Single Terraform codebase reused across environments with variable overrides.
+
+### CI/CD Governance
+- PR-based validation ensures secure and reliable infrastructure updates.
+- Approvals are required for production deployments.
+
+### Secrets Management
+- Sensitive credentials are securely stored in **Azure Key Vault**.
+- Strict access control:
+  - Terraform Service Principal for writes.
+  - Web App Managed Identity for read-only access.
+- No secrets are hardcoded in the codebase or pipelines.
 
 ---
 
 ## 12. Conclusion
 
-This project demonstrates a real-world DevOps implementation using Terraform, Azure, and GitHub Actions, with a strong focus on automation, security, and governance.
+This project demonstrates a real-world DevOps implementation using Terraform, Azure, Key Vault, and GitHub Actions. The overall focus is on secure infrastructure management, automation, and governance.
 
 ---
 
