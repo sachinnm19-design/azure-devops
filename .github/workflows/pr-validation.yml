@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_WORKSPACE: dev   # ⭐ CRITICAL FIX
+      TF_WORKSPACE: dev
 
     steps:
       - name: Checkout repository
