@@ -162,7 +162,8 @@ Each workspace represents a separate environment.
 | webapp_name          |
 
 #### Environment Variables
-
+| Key                  |
+|----------------------|
 | ARM_CLIENT_ID        | 
 | ARM_CLIENT_SECRET    | 
 | ARM_SUBSCRIPTION_ID  | 
