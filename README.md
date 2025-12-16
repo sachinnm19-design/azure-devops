@@ -17,6 +17,10 @@ The solution provisions Azure infrastructure, builds a containerized application
 
 ## 2. High-Level Architecture
 
+For visual representations of the architecture, see the diagrams in the `images/` folder:
+- **Azure Cloud Architecture.jpg**: Azure infrastructure and resource relationships
+- **CI CD Architecture.jpg**: Complete CI/CD pipeline flow
+
 ### Azure Resources Provisioned
 - Resource Group
 - Azure Container Registry (ACR)
@@ -51,6 +55,10 @@ All sensitive credentials are securely stored in Azure Key Vault, eliminating th
 │ ├── provider.tf # Providers & backend configuration
 │ ├── variables.tf # Input variables
 │ └── outputs.tf # Output values
+│
+├── images/
+│ ├── Azure Cloud Architecture.jpg
+│ └── CI CD Architecture.jpg
 │
 ├── .github/
 │ └── workflows/
