@@ -168,6 +168,7 @@ Each workspace represents a separate environment.
 | ARM_CLIENT_SECRET    | 
 | ARM_SUBSCRIPTION_ID  | 
 | ARM_TENANT_ID        |
+
 Mark all sensitive environment variables appropriately in Terraform Cloud.
 
 ---
