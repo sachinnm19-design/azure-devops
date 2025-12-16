@@ -17,20 +17,27 @@ The solution provisions Azure infrastructure, builds a containerized application
 
 ## 2. High-Level Architecture
 
+For visual representations of the architecture, see the diagrams in the `images/` folder:
+- **Azure Cloud Architecture.jpg**: Azure infrastructure and resource relationships
+- **CI CD Architecture.jpg**: Complete CI/CD pipeline flow
+
 ### Azure Resources Provisioned
-Included architecture diagrams for better understanding:
-
-#### Diagram 1: High-Level Workflow  
-![Architecture Diagram](path/to/image4.jpg)
-
-#### Diagram 2: Azure Infrastructure  
-![Azure Infrastructure Diagram](path/to/image5.jpg)
-
 - Resource Group
 - Azure Container Registry (ACR)
 - App Service Plan (Linux)
 - Azure Web App for Containers
 - **Azure Key Vault**: Secure storage for sensitive application secrets (e.g., ACR credentials).
+
+### CI/CD Flow
+1. Developer creates a feature branch and raises a Pull Request
+2. CI pipeline runs Terraform plan (DEV workspace) and Docker build validation
+3. Pull Request is reviewed and approved
+4. Merge to `main` triggers CD pipeline
+5. DEV deployment happens automatically
+6. PROD deployment requires manual approval
+
+Terraform state and environment separation are handled using Terraform Cloud workspaces.
+All sensitive credentials are securely stored in Azure Key Vault, eliminating the risk of hardcoding secrets.
 
 ---
 
@@ -48,6 +55,10 @@ Included architecture diagrams for better understanding:
 │ ├── provider.tf # Providers & backend configuration
 │ ├── variables.tf # Input variables
 │ └── outputs.tf # Output values
+│
+├── images/
+│ ├── Azure Cloud Architecture.jpg
+│ └── CI CD Architecture.jpg
 │
 ├── .github/
 │ └── workflows/
@@ -137,8 +148,6 @@ Each workspace represents a separate environment.
 ### 7.3 Configure Variables
 
 #### Terraform Variables
-Below tables list all configured Terraform variables and environment variables.
-
 | Key                  |
 |----------------------|
 | acr_name             |
@@ -253,7 +262,7 @@ Expected response:
 
 ## 12. Conclusion
 
-This project demonstrates a real-world DevOps implementation using Terraform, Azure, Key Vault, and GitHub Actions. The overall focus is on secure infrastructure management, automation, and governance[...]
+This project demonstrates a real-world DevOps implementation using Terraform, Azure, Key Vault, and GitHub Actions. The overall focus is on secure infrastructure management, automation, and governance.
 
 ---
 
