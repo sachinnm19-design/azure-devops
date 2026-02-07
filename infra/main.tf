@@ -89,7 +89,7 @@ resource "azurerm_key_vault_secret" "acr_password" {
 }
 
 ############################################
-# Web App (Identity First)
+# Web App (NO depends_on)
 ############################################
 resource "azurerm_linux_web_app" "webapp" {
   name                = var.webapp_name
@@ -100,11 +100,6 @@ resource "azurerm_linux_web_app" "webapp" {
   identity {
     type = "SystemAssigned"
   }
-
-  # Web App must wait for Key Vault access policy
-  depends_on = [
-    azurerm_key_vault_access_policy.webapp
-  ]
 
   site_config {
     application_stack {
