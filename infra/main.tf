@@ -18,11 +18,11 @@ resource "azurerm_container_registry" "acr" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   sku                 = "Basic"
-  admin_enabled       = true
+  admin_enabled       = false  # ✅ CHANGED: Disabled admin credentials
 }
 
 ############################################
-# Key Vault
+# Key Vault (OPTIONAL - only for other secrets)
 ############################################
 resource "azurerm_key_vault" "kv" {
   name                = "${var.acr_name}-kv"
@@ -66,30 +66,7 @@ resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
 }
 
 ############################################
-# Key Vault Secrets
-############################################
-resource "azurerm_key_vault_secret" "acr_username" {
-  name         = "acr-admin-username"
-  value        = azurerm_container_registry.acr.admin_username
-  key_vault_id = azurerm_key_vault.kv.id
-
-  depends_on = [
-    azurerm_key_vault_access_policy.terraform_spn_access
-  ]
-}
-
-resource "azurerm_key_vault_secret" "acr_password" {
-  name         = "acr-admin-password"
-  value        = azurerm_container_registry.acr.admin_password
-  key_vault_id = azurerm_key_vault.kv.id
-
-  depends_on = [
-    azurerm_key_vault_access_policy.terraform_spn_access
-  ]
-}
-
-############################################
-# Web App (NO depends_on)
+# Web App with Managed Identity
 ############################################
 resource "azurerm_linux_web_app" "webapp" {
   name                = var.webapp_name
@@ -97,6 +74,7 @@ resource "azurerm_linux_web_app" "webapp" {
   location            = var.location
   service_plan_id     = azurerm_service_plan.asp.id
 
+  # ✅ CRITICAL: System-assigned Managed Identity
   identity {
     type = "SystemAssigned"
   }
@@ -105,24 +83,34 @@ resource "azurerm_linux_web_app" "webapp" {
     application_stack {
       docker_image_name   = "${var.image_name}:${var.image_tag}"
       docker_registry_url = "https://${azurerm_container_registry.acr.login_server}"
-
-      docker_registry_username = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.acr_username.id})"
-      docker_registry_password = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.acr_password.id})"
     }
+    # ✅ NEW: No docker_registry_username/password needed!
   }
 
   app_settings = {
-    WEBSITES_PORT = "3000"
-    AzureWebJobsSecretStorageType = "keyvault"
+    # ✅ CRITICAL: Enable managed identity for ACR
+    "DOCKER_REGISTRY_SERVER_URL"      = "https://${azurerm_container_registry.acr.login_server}"
+    "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
   }
-
-  https_only = true
 }
 
 ############################################
-# Access Policy for Web App Managed Identity
+# Grant Web App Managed Identity AcrPull Role
 ############################################
-resource "azurerm_key_vault_access_policy" "webapp" {
+resource "azurerm_role_assignment" "webapp_acr_pull" {
+  scope                = azurerm_container_registry.acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_linux_web_app.webapp.identity[0].principal_id
+
+  depends_on = [
+    azurerm_linux_web_app.webapp
+  ]
+}
+
+############################################
+# Grant Web App Access to Key Vault (for other secrets)
+############################################
+resource "azurerm_key_vault_access_policy" "webapp_kv_access" {
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id
@@ -137,7 +125,4 @@ resource "azurerm_key_vault_access_policy" "webapp" {
   ]
 }
 
-############################################
-# Client Config
-############################################
 data "azurerm_client_config" "current" {}
