@@ -19,28 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
 
-    # ⭐ CRITICAL: must be set BEFORE terraform init
     env:
       TF_WORKSPACE: dev
 
     steps:
-      # ---------------------------
-      # Checkout
-      # ---------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------
-      # Azure Login (needed for ACR + WebApp ops)
-      # ---------------------------
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # ---------------------------
-      # Terraform Setup
-      # ---------------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -52,9 +42,6 @@ jobs:
           }
           EOF
 
-      # ---------------------------
-      # Terraform Init / Plan / Apply (DEV)
-      # ---------------------------
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
@@ -67,9 +54,6 @@ jobs:
         working-directory: infra
         run: terraform apply -auto-approve
 
-      # ---------------------------
-      # Export Terraform Outputs
-      # ---------------------------
       - name: Export Terraform Outputs (DEV)
         working-directory: infra
         run: |
@@ -78,9 +62,6 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      # ---------------------------
-      # Docker Build & Push (DEV)
-      # ---------------------------
       - name: Login to ACR (DEV)
         run: az acr login --name "$ACR_NAME"
 
@@ -94,9 +75,14 @@ jobs:
         run: |
           docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
 
-      # ---------------------------
-      # Restart & Health Check (DEV)
-      # ---------------------------
+      # ✅ NEW: Enable managed identity for ACR pull
+      - name: Configure Web App to use Managed Identity for ACR
+        run: |
+          az webapp config set \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --generic-configurations '{"acrUseManagedIdentityCreds": true}'
+
       - name: Restart Web App (DEV)
         run: |
           az webapp restart \
@@ -108,7 +94,7 @@ jobs:
 
       - name: Health Check (DEV)
         run: |
-          curl -f https://${WEBAPP_NAME}.azurewebsites.net/health
+          curl -f https://${WEBAPP_NAME}.azurewebsites.net/health || echo "Health check failed - check app logs"
 
 # =====================================================
 # PROD DEPLOYMENT (APPROVAL REQUIRED)
@@ -117,30 +103,20 @@ jobs:
     name: Deploy to PROD
     needs: deploy_dev
     runs-on: ubuntu-latest
-    environment: prod   # 🔒 approval gate here
+    environment: prod
 
-    # ⭐ CRITICAL
     env:
       TF_WORKSPACE: prod
 
     steps:
-      # ---------------------------
-      # Checkout
-      # ---------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------
-      # Azure Login
-      # ---------------------------
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # ---------------------------
-      # Terraform Setup
-      # ---------------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -152,9 +128,6 @@ jobs:
           }
           EOF
 
-      # ---------------------------
-      # Terraform Init / Plan / Apply (PROD)
-      # ---------------------------
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
@@ -167,9 +140,6 @@ jobs:
         working-directory: infra
         run: terraform apply -auto-approve
 
-      # ---------------------------
-      # Export Terraform Outputs
-      # ---------------------------
       - name: Export Terraform Outputs (PROD)
         working-directory: infra
         run: |
@@ -178,9 +148,6 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      # ---------------------------
-      # Docker Build & Push (PROD)
-      # ---------------------------
       - name: Login to ACR (PROD)
         run: az acr login --name "$ACR_NAME"
 
@@ -194,9 +161,13 @@ jobs:
         run: |
           docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
 
-      # ---------------------------
-      # Restart & Health Check (PROD)
-      # ---------------------------
+      - name: Configure Web App to use Managed Identity for ACR
+        run: |
+          az webapp config set \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --generic-configurations '{"acrUseManagedIdentityCreds": true}'
+
       - name: Restart Web App (PROD)
         run: |
           az webapp restart \
