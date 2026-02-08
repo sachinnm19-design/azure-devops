@@ -13,3 +13,14 @@ output "resource_group_name" {
 output "webapp_name" {
   value = azurerm_linux_web_app.webapp.name
 }
+
+# ✅ NEW: Output managed identity details
+output "webapp_principal_id" {
+  description = "Principal ID of the Web App's managed identity"
+  value       = azurerm_linux_web_app.webapp.identity[0].principal_id
+}
+
+output "webapp_tenant_id" {
+  description = "Tenant ID of the Web App's managed identity"
+  value       = azurerm_linux_web_app.webapp.identity[0].tenant_id
+}
