@@ -84,12 +84,10 @@ resource "azurerm_linux_web_app" "webapp" {
       docker_image_name   = "${var.image_name}:${var.image_tag}"
       docker_registry_url = "https://${azurerm_container_registry.acr.login_server}"
     }
-    # ✅ NEW: No docker_registry_username/password needed!
   }
 
   app_settings = {
-    # ✅ CRITICAL: Enable managed identity for ACR
-    "DOCKER_REGISTRY_SERVER_URL"      = "https://${azurerm_container_registry.acr.login_server}"
+    # ✅ REMOVED: DOCKER_REGISTRY_SERVER_URL (automatically set by docker_registry_url)
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
   }
 }
