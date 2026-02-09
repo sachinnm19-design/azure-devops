@@ -8,12 +8,12 @@ terraform {
     }
   }
 
-  # Terraform Cloud remote state + runs
+  #  Single workspace - no prefix
   backend "remote" {
     organization = "TerraformDevOpsDemo"
-
+    
     workspaces {
-      prefix = "devops-demo-"
+      name = "devops-demo"  # Single workspace for all environments
     }
   }
 }
