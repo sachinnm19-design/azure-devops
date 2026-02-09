@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
 
+    env:
+      TF_WORKSPACE: dev
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,18 +42,17 @@ jobs:
           }
           EOF
 
-      # ✅ Use -var-file to load environment-specific variables
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
 
       - name: Terraform Plan (DEV)
         working-directory: infra
-        run: terraform plan -var-file="environments/dev.tfvars"
+        run: terraform plan
 
       - name: Terraform Apply (DEV)
         working-directory: infra
-        run: terraform apply -auto-approve -var-file="environments/dev.tfvars"
+        run: terraform apply -auto-approve
 
       - name: Export Terraform Outputs (DEV)
         working-directory: infra
@@ -73,6 +75,7 @@ jobs:
         run: |
           docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
 
+      # ✅ NEW: Enable managed identity for ACR pull
       - name: Configure Web App to use Managed Identity for ACR
         run: |
           az webapp config set \
@@ -102,6 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
 
+    env:
+      TF_WORKSPACE: prod
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -122,18 +128,17 @@ jobs:
           }
           EOF
 
-      # ✅ Use -var-file to load production variables
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
 
       - name: Terraform Plan (PROD)
         working-directory: infra
-        run: terraform plan -var-file="environments/prod.tfvars"
+        run: terraform plan
 
       - name: Terraform Apply (PROD)
         working-directory: infra
-        run: terraform apply -auto-approve -var-file="environments/prod.tfvars"
+        run: terraform apply -auto-approve
 
       - name: Export Terraform Outputs (PROD)
         working-directory: infra
