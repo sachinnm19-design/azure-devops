@@ -9,6 +9,9 @@ jobs:
   pr-validate:
     runs-on: ubuntu-latest
 
+    env:
+      TF_WORKSPACE: dev
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,11 +27,7 @@ jobs:
           }
           EOF
 
-      # ✅ Copy dev.tfvars to terraform.auto.tfvars
-      - name: Setup Dev Variables
-        working-directory: infra
-        run: cp environments/dev.tfvars terraform.auto.tfvars
-
+      # ✅ Now init knows which workspace to use
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
