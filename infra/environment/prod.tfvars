@@ -2,7 +2,7 @@
 environment           = "prod"
 location              = "eastus"
 resource_group_name   = "rg-devops-demo-prod"
-acr_name              = "devopsdemoacrprod9578"  # Must be globally unique
+acr_name              = "devopsdemoacrprod9568"  # Must be globally unique
 app_service_plan_name = "asp-devops-demo-prod"
 webapp_name           = "devops-demo-webapp-prod"
 sku_name              = "P1V2"  # Premium tier for production
