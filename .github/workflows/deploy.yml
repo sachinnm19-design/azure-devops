@@ -39,7 +39,7 @@ jobs:
           }
           EOF
 
-      # ✅ Use -var-file to load environment-specific variables
+      # ✅ CHANGED: Removed TF_WORKSPACE env var, using -var-file instead
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
@@ -122,7 +122,7 @@ jobs:
           }
           EOF
 
-      # ✅ Use -var-file to load production variables
+      # ✅ CHANGED: Using -var-file for prod
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
