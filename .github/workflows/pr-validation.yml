@@ -24,15 +24,18 @@ jobs:
           }
           EOF
 
-      # ✅ CHANGED: Removed TF_WORKSPACE env var
+      # ✅ Copy dev.tfvars to terraform.auto.tfvars
+      - name: Setup Dev Variables
+        working-directory: infra
+        run: cp environments/dev.tfvars terraform.auto.tfvars
+
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
 
-      # ✅ CHANGED: Using -var-file for dev validation
       - name: Terraform Plan (DEV)
         working-directory: infra
-        run: terraform plan -var-file="environments/dev.tfvars"
+        run: terraform plan
 
       - name: Docker Build Validation
         run: docker build -t pr-validate ./app
