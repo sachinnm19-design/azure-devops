@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
 
+    env:
+      TF_WORKSPACE: dev
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,11 +41,6 @@ jobs:
             token = "${{ secrets.TF_API_TOKEN }}"
           }
           EOF
-
-      # ✅ Copy dev.tfvars to terraform.auto.tfvars
-      - name: Setup Dev Variables
-        working-directory: infra
-        run: cp environments/dev.tfvars terraform.auto.tfvars
 
       - name: Terraform Init
         working-directory: infra
@@ -77,6 +75,7 @@ jobs:
         run: |
           docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
 
+      # ✅ NEW: Enable managed identity for ACR pull
       - name: Configure Web App to use Managed Identity for ACR
         run: |
           az webapp config set \
@@ -106,6 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
 
+    env:
+      TF_WORKSPACE: prod
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -125,11 +127,6 @@ jobs:
             token = "${{ secrets.TF_API_TOKEN }}"
           }
           EOF
-
-      # ✅ Copy prod.tfvars to terraform.auto.tfvars
-      - name: Setup Prod Variables
-        working-directory: infra
-        run: cp environments/prod.tfvars terraform.auto.tfvars
 
       - name: Terraform Init
         working-directory: infra
