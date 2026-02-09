@@ -8,26 +8,16 @@ terraform {
     }
   }
 
-  # Single workspace - no prefix
+  # Terraform Cloud remote state + runs
   backend "remote" {
     organization = "TerraformDevOpsDemo"
-    
+
     workspaces {
-      name = "devops-demo"
+      prefix = "devops-demo-"
     }
   }
 }
 
 provider "azurerm" {
   features {}
-  
-  # ✅ Use environment variables for authentication
-  # These will be set by GitHub Actions from AZURE_CREDENTIALS secret
-  use_cli                         = false
-  use_msi                         = false
-  use_oidc                        = false
-  skip_provider_registration      = false
 }
-
-# ❌ REMOVED: data "azurerm_client_config" "current" {} 
-# This is already defined in main.tf
