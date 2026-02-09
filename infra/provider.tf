@@ -8,16 +8,25 @@ terraform {
     }
   }
 
-  #  Single workspace - no prefix
+  # Single workspace - no prefix
   backend "remote" {
     organization = "TerraformDevOpsDemo"
     
     workspaces {
-      name = "devops-demo"  # Single workspace for all environments
+      name = "devops-demo"
     }
   }
 }
 
 provider "azurerm" {
   features {}
+  
+  # Use environment variables for authentication
+  # These will be set by GitHub Actions from AZURE_CREDENTIALS secret
+  use_cli                         = false
+  use_msi                         = false
+  use_oidc                        = false
+  skip_provider_registration      = false
 }
+
+data "azurerm_client_config" "current" {}
