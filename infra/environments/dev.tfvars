@@ -1,6 +1,6 @@
 # Development Environment Variables
 environment           = "dev"
-location              = "eastus"  # Change to your preferred region
+location              = "uksouth"  # Change to your preferred region
 resource_group_name   = "rg-devops-demo-dev"
 acr_name              = "devopsdemoacrdev9598"  # Must be globally unique
 app_service_plan_name = "asp-devops-demo-dev"
