@@ -9,9 +9,6 @@ jobs:
   pr-validate:
     runs-on: ubuntu-latest
 
-    env:
-      TF_WORKSPACE: dev
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,14 +24,15 @@ jobs:
           }
           EOF
 
-      # ✅ Now init knows which workspace to use
+      # ✅ CHANGED: Removed TF_WORKSPACE env var
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
 
+      # ✅ CHANGED: Using -var-file for dev validation
       - name: Terraform Plan (DEV)
         working-directory: infra
-        run: terraform plan
+        run: terraform plan -var-file="environments/dev.tfvars"
 
       - name: Docker Build Validation
         run: docker build -t pr-validate ./app
