@@ -39,18 +39,24 @@ jobs:
           }
           EOF
 
-      # ✅ CHANGED: Removed TF_WORKSPACE env var, using -var-file instead
+      # ✅ Copy dev.tfvars to terraform.auto.tfvars
+      - name: Setup Dev Variables
+        working-directory: infra
+        run: cp environments/dev.tfvars terraform.auto.tfvars
+
       - name: Terraform Init
         working-directory: infra
         run: terraform init -upgrade
 
+      # ✅ REMOVED -var-file flag
       - name: Terraform Plan (DEV)
         working-directory: infra
-        run: terraform plan -var-file="environments/dev.tfvars"
+        run: terraform plan
 
+      # ✅ REMOVED -var-file flag
       - name: Terraform Apply (DEV)
         working-directory: infra
-        run: terraform apply -auto-approve -var-file="environments/dev.tfvars"
+        run: terraform apply -auto-approve
 
       - name: Export Terraform Outputs (DEV)
         working-directory: infra
@@ -78,100 +84,4 @@ jobs:
           az webapp config set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --generic-configurations '{"acrUseManagedIdentityCreds": true}'
-
-      - name: Restart Web App (DEV)
-        run: |
-          az webapp restart \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
-
-      - name: Wait for App Startup (DEV)
-        run: sleep 120
-
-      - name: Health Check (DEV)
-        run: |
-          curl -f https://${WEBAPP_NAME}.azurewebsites.net/health || echo "Health check failed - check app logs"
-
-# =====================================================
-# PROD DEPLOYMENT (APPROVAL REQUIRED)
-# =====================================================
-  deploy_prod:
-    name: Deploy to PROD
-    needs: deploy_dev
-    runs-on: ubuntu-latest
-    environment: prod
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Login to Azure
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Configure Terraform Cloud Token
-        run: |
-          cat > ~/.terraformrc <<'EOF'
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOF
-
-      # ✅ CHANGED: Using -var-file for prod
-      - name: Terraform Init
-        working-directory: infra
-        run: terraform init -upgrade
-
-      - name: Terraform Plan (PROD)
-        working-directory: infra
-        run: terraform plan -var-file="environments/prod.tfvars"
-
-      - name: Terraform Apply (PROD)
-        working-directory: infra
-        run: terraform apply -auto-approve -var-file="environments/prod.tfvars"
-
-      - name: Export Terraform Outputs (PROD)
-        working-directory: infra
-        run: |
-          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
-
-      - name: Login to ACR (PROD)
-        run: az acr login --name "$ACR_NAME"
-
-      - name: Build Docker Image (PROD)
-        run: |
-          docker build \
-            -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} \
-            ./app
-
-      - name: Push Docker Image (PROD)
-        run: |
-          docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
-
-      - name: Configure Web App to use Managed Identity for ACR
-        run: |
-          az webapp config set \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --generic-configurations '{"acrUseManagedIdentityCreds": true}'
-
-      - name: Restart Web App (PROD)
-        run: |
-          az webapp restart \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
-
-      - name: Wait for App Startup (PROD)
-        run: sleep 120
-
-      - name: Health Check (PROD)
-        run: |
-          curl -f https://${WEBAPP_NAME}.azurewebsites.net/health
+            --generic-configurations '{"acrUseM
