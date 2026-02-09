@@ -6,6 +6,7 @@ variable "environment" {
 variable "location" {
   type        = string
   description = "The Azure region where resources will be deployed (e.g., 'eastus', 'westus2')."
+  default     = "eastus"
 }
 
 variable "resource_group_name" {
@@ -31,33 +32,26 @@ variable "webapp_name" {
 variable "sku_name" {
   type        = string
   description = "The SKU name for the App Service Plan (e.g., 'B1', 'P1V2'). Determines performance and pricing."
+  default     = "B1"
 }
 
 variable "image_name" {
   type        = string
   description = "The name of the container image to be deployed in the Azure Web App."
+  default     = "demo-app"
 }
 
 variable "image_tag" {
   type        = string
   description = "The tag used to identify the version of the container image (e.g., 'latest', 'v1.0.0')."
+  default     = "latest"
 }
 
-# Additions for Key Vault
-variable "key_vault_name" {
-  type        = string
-  default     = "" # Default to be provided during runtime
-  description = "The name of the Azure Key Vault to be created for storing sensitive credentials such as ACR admin secrets."
-}
-
-variable "key_vault_access_policy" {
-  type        = list(object({
-    object_id   = string
-    permissions = list(string)
-  }))
-  default = []
-  description = "A list of access policies specifying the object IDs and permissions for users or components accessing the Azure Key Vault."
-}
 variable "sp_object_id" {
+  type        = string
   description = "Object ID of the Service Principal used by Terraform"
 }
+
+# Removed unused variables
+# variable "key_vault_name" - not needed, we derive it from acr_name
+# variable "key_vault_access_policy" - not needed, we manage it explicitly
