@@ -1,6 +1,6 @@
 # Production Environment Variables
 environment           = "prod"
-location              = "eastus"
+location              = "uksouth"
 resource_group_name   = "rg-devops-demo-prod"
 acr_name              = "devopsdemoacrprod9568"  # Must be globally unique
 app_service_plan_name = "asp-devops-demo-prod"
