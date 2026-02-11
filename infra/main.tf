@@ -1,10 +1,4 @@
 ############################################
-# Data Sources
-############################################
-data "azurerm_client_config" "current" {}
-data "azurerm_subscription" "current" {}
-
-############################################
 # Resource Group
 ############################################
 resource "azurerm_resource_group" "rg" {
