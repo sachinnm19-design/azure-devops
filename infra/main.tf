@@ -31,11 +31,11 @@ resource "azurerm_application_insights" "app_insights" {
 module "acr" {
   source = "./modules/acr"
 
-  acr_name                  = var.acr_name
-  resource_group_name       = azurerm_resource_group.rg.name
-  location                  = var.location
-  sku                       = "Premium"  # CHANGED: Must be Premium to disable public access
-  public_access_enabled     = false      # CHANGED: Now we can disable public access
+  acr_name            = var.acr_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  sku                 = "Basic"
+  public_access_enabled = var.environment == "prod" ? false : true
 
   tags = {
     environment = var.environment
