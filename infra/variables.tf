@@ -43,21 +43,15 @@ variable "image_tag" {
   description = "The tag used to identify the version of the container image (e.g., 'latest', 'v1.0.0')."
 }
 
-# Additions for Key Vault
-variable "key_vault_name" {
+variable "sp_object_id" {
   type        = string
-  default     = "" # Default to be provided during runtime
-  description = "The name of the Azure Key Vault to be created for storing sensitive credentials such as ACR admin secrets."
+  description = "Object ID of the Service Principal used by Terraform"
 }
 
-variable "key_vault_access_policy" {
-  type        = list(object({
-    object_id   = string
-    permissions = list(string)
+variable "ip_restrictions" {
+  type = list(object({
+    ip_address = string
   }))
-  default = []
-  description = "A list of access policies specifying the object IDs and permissions for users or components accessing the Azure Key Vault."
-}
-variable "sp_object_id" {
-  description = "Object ID of the Service Principal used by Terraform"
+  default     = []
+  description = "List of IP addresses allowed to access the web app"
 }

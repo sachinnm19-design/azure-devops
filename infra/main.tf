@@ -7,22 +7,84 @@ resource "azurerm_resource_group" "rg" {
 
   tags = {
     environment = var.environment
+    managed_by  = "terraform"
   }
 }
 
 ############################################
-# Azure Container Registry
+# Application Insights
 ############################################
-resource "azurerm_container_registry" "acr" {
-  name                = var.acr_name
-  resource_group_name = azurerm_resource_group.rg.name
+resource "azurerm_application_insights" "app_insights" {
+  name                = "${var.webapp_name}-insights"
   location            = var.location
-  sku                 = "Basic"
-  admin_enabled       = false  # ✅ CHANGED: Disabled admin credentials
+  resource_group_name = azurerm_resource_group.rg.name
+  application_type    = "web"
+
+  tags = {
+    environment = var.environment
+  }
 }
 
 ############################################
-# Key Vault (OPTIONAL - only for other secrets)
+# ACR Module
+############################################
+module "acr" {
+  source = "./modules/acr"
+
+  acr_name            = var.acr_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  sku                 = "Basic"
+  public_access_enabled = var.environment == "prod" ? false : true
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+############################################
+# Networking Module
+############################################
+module "networking" {
+  source = "./modules/networking"
+
+  resource_prefix     = var.webapp_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  create_nsg          = true
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+############################################
+# App Service Module
+############################################
+module "app_service" {
+  source = "./modules/app_service"
+
+  app_service_plan_name = var.app_service_plan_name
+  webapp_name           = var.webapp_name
+  resource_group_name   = azurerm_resource_group.rg.name
+  location              = var.location
+  sku_name              = var.sku_name
+  image_name            = var.image_name
+  image_tag             = var.image_tag
+  acr_login_server      = module.acr.acr_login_server
+  
+  app_insights_key               = azurerm_application_insights.app_insights.instrumentation_key
+  app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
+  
+  ip_restrictions = var.ip_restrictions
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+############################################
+# Key Vault
 ############################################
 resource "azurerm_key_vault" "kv" {
   name                = "${var.acr_name}-kv"
@@ -31,25 +93,16 @@ resource "azurerm_key_vault" "kv" {
   sku_name            = "standard"
   tenant_id           = data.azurerm_client_config.current.tenant_id
 
-  depends_on = [
-    azurerm_container_registry.acr
-  ]
+  enable_rbac_authorization = false
+  purge_protection_enabled  = false
+
+  tags = {
+    environment = var.environment
+  }
 }
 
 ############################################
-# App Service Plan
-############################################
-resource "azurerm_service_plan" "asp" {
-  name                = var.app_service_plan_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-
-  os_type  = "Linux"
-  sku_name = var.sku_name
-}
-
-############################################
-# Access Policy for Terraform SPN
+# Key Vault Access Policies
 ############################################
 resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
   key_vault_id = azurerm_key_vault.kv.id
@@ -57,70 +110,23 @@ resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
   object_id    = var.sp_object_id
 
   secret_permissions = [
-    "Get",
-    "List",
-    "Set",
-    "Delete",
-    "Recover"
+    "Get", "List", "Set", "Delete", "Recover", "Purge"
   ]
 }
 
-############################################
-# Web App with Managed Identity
-############################################
-resource "azurerm_linux_web_app" "webapp" {
-  name                = var.webapp_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  service_plan_id     = azurerm_service_plan.asp.id
-
-  # ✅ CRITICAL: System-assigned Managed Identity
-  identity {
-    type = "SystemAssigned"
-  }
-
-  site_config {
-    application_stack {
-      docker_image_name   = "${var.image_name}:${var.image_tag}"
-      docker_registry_url = "https://${azurerm_container_registry.acr.login_server}"
-    }
-  }
-
-  app_settings = {
-    # ✅ REMOVED: DOCKER_REGISTRY_SERVER_URL (automatically set by docker_registry_url)
-    "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
-  }
-}
-
-############################################
-# Grant Web App Managed Identity AcrPull Role
-############################################
-resource "azurerm_role_assignment" "webapp_acr_pull" {
-  scope                = azurerm_container_registry.acr.id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_linux_web_app.webapp.identity[0].principal_id
-
-  depends_on = [
-    azurerm_linux_web_app.webapp
-  ]
-}
-
-############################################
-# Grant Web App Access to Key Vault (for other secrets)
-############################################
 resource "azurerm_key_vault_access_policy" "webapp_kv_access" {
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.webapp.identity[0].principal_id
+  object_id    = module.app_service.webapp_principal_id
 
-  secret_permissions = [
-    "Get",
-    "List"
-  ]
-
-  depends_on = [
-    azurerm_linux_web_app.webapp
-  ]
+  secret_permissions = ["Get", "List"]
 }
 
-data "azurerm_client_config" "current" {}
+############################################
+# Role Assignments
+############################################
+resource "azurerm_role_assignment" "webapp_acr_pull" {
+  scope                = module.acr.acr_id
+  role_definition_name = "AcrPull"
+  principal_id         = module.app_service.webapp_principal_id
+}
