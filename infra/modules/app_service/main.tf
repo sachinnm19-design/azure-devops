@@ -13,7 +13,7 @@ resource "azurerm_linux_web_app" "webapp" {
   resource_group_name = var.resource_group_name
   location            = var.location
   service_plan_id     = azurerm_service_plan.asp.id
-  https_only          = true  # Enforce HTTPS
+  https_only          = true
 
   identity {
     type = "SystemAssigned"
@@ -29,7 +29,7 @@ resource "azurerm_linux_web_app" "webapp" {
     dynamic "ip_restriction" {
       for_each = var.ip_restrictions
       content {
-        ip_address = ip_restriction.value.ip_address
+        ip_address = "${ip_restriction.value.ip_address}/32"  # ADD /32 HERE
         action     = "Allow"
       }
     }
@@ -45,4 +45,6 @@ resource "azurerm_linux_web_app" "webapp" {
     },
     var.additional_app_settings
   )
+
+  tags = var.tags
 }
