@@ -56,7 +56,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     
-    # ADD THIS PERMISSIONS BLOCK
     permissions:
       contents: read
       security-events: write
@@ -83,11 +82,15 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy Results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4  # CHANGED FROM v3 TO v4
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
-        continue-on-error: true  # ADD THIS LINE
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
+
+      # ADD THIS STEP BEFORE TERRAFORM COMMANDS
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Format Check
         working-directory: infra
