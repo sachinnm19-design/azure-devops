@@ -55,6 +55,12 @@ jobs:
     name: Security & Quality Checks
     needs: build
     runs-on: ubuntu-latest
+    
+    # ADD THIS PERMISSIONS BLOCK
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
 
     steps:
       - name: Checkout repository
@@ -77,8 +83,9 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy Results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4  # CHANGED FROM v3 TO v4
         if: always()
+        continue-on-error: true  # ADD THIS LINE
         with:
           sarif_file: 'trivy-results.sarif'
 
