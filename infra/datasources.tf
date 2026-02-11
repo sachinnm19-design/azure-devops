@@ -2,11 +2,11 @@ data "azurerm_client_config" "current" {}
 
 data "azurerm_subscription" "current" {}
 
-# Get resource providers if needed
-data "azurerm_resource_provider" "compute" {
+# Check resource provider registration status
+data "azurerm_resource_provider_registration" "compute" {
   name = "Microsoft.Compute"
 }
 
-data "azurerm_resource_provider" "container_registry" {
+data "azurerm_resource_provider_registration" "container_registry" {
   name = "Microsoft.ContainerRegistry"
 }
