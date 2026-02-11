@@ -88,7 +88,6 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-      # ADD THIS STEP BEFORE TERRAFORM COMMANDS
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -146,11 +145,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: infra
-        run: terraform plan -out=tfplan
+        run: terraform plan
 
       - name: Terraform Apply
         working-directory: infra
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve
 
       - name: Export Terraform Outputs
         working-directory: infra
@@ -264,11 +263,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: infra
-        run: terraform plan -out=tfplan
+        run: terraform plan
 
       - name: Terraform Apply
         working-directory: infra
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve
 
       - name: Export Terraform Outputs
         working-directory: infra
