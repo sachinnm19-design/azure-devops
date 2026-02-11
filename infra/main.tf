@@ -29,7 +29,7 @@ resource "azurerm_application_insights" "app_insights" {
 # ACR Module
 ############################################
 module "acr" {
-  source = "../modules/acr"
+  source = "./modules/acr"
 
   acr_name            = var.acr_name
   resource_group_name = azurerm_resource_group.rg.name
@@ -46,7 +46,7 @@ module "acr" {
 # Networking Module
 ############################################
 module "networking" {
-  source = "../modules/networking"
+  source = "./modules/networking"
 
   resource_prefix     = var.webapp_name
   resource_group_name = azurerm_resource_group.rg.name
@@ -62,7 +62,7 @@ module "networking" {
 # App Service Module
 ############################################
 module "app_service" {
-  source = "../modules/app_service"
+  source = "./modules/app_service"
 
   app_service_plan_name = var.app_service_plan_name
   webapp_name           = var.webapp_name
