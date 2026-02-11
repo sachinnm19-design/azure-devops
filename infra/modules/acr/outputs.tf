@@ -1,11 +1,14 @@
 output "acr_id" {
-  value = azurerm_container_registry.acr.id
+  description = "The ID of the Container Registry"
+  value       = azurerm_container_registry.acr.id
 }
 
 output "acr_name" {
-  value = azurerm_container_registry.acr.name
+  description = "The name of the Container Registry"
+  value       = azurerm_container_registry.acr.name
 }
 
 output "acr_login_server" {
-  value = azurerm_container_registry.acr.login_server
+  description = "The login server URL of the Container Registry"
+  value       = azurerm_container_registry.acr.login_server
 }
