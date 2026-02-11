@@ -76,7 +76,12 @@ module "app_service" {
   app_insights_key               = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
   
-  ip_restrictions = var.ip_restrictions
+  # ADD THIS:
+  ip_restrictions = [
+    {
+      ip_address = "2.223.114.28"
+    }
+  ]
 
   tags = {
     environment = var.environment
