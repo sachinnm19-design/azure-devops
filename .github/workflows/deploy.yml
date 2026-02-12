@@ -159,20 +159,32 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: Login to Private ACR
+      - name: Temporarily Enable ACR Public Access
         run: |
-          echo "🔐 Logging into Private ACR using Service Principal..."
+          echo "🔓 Temporarily enabling ACR public access for image push..."
+          az acr update \
+            --name ${ACR_NAME} \
+            --public-network-enabled true
+          
+          echo "⏳ Waiting 20 seconds for ACR update to propagate..."
+          sleep 20
+          
+          echo "✅ ACR public access temporarily enabled"
+
+      - name: Login to ACR
+        run: |
+          echo "🔐 Logging into ACR..."
           
           # Extract credentials from Azure CLI login
           CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
           CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
-          # Login to ACR using Service Principal (works with private ACR)
+          # Login to ACR using Service Principal
           echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
             --username "$CLIENT_ID" \
             --password-stdin
           
-          echo "✅ Successfully logged into private ACR"
+          echo "✅ Successfully logged into ACR"
 
       - name: Tag and Push Image to ACR
         run: |
@@ -187,6 +199,16 @@ jobs:
           docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
           echo "✅ Images pushed successfully"
+
+      - name: Disable ACR Public Access
+        if: always()
+        run: |
+          echo "🔒 Re-disabling ACR public access..."
+          az acr update \
+            --name ${ACR_NAME} \
+            --public-network-enabled false
+          
+          echo "✅ ACR is now private again"
 
       - name: Configure Web App Managed Identity for ACR
         run: |
@@ -304,20 +326,30 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: Login to Private ACR
+      - name: Temporarily Enable ACR Public Access
         run: |
-          echo "🔐 Logging into Private ACR using Service Principal..."
+          echo "🔓 Temporarily enabling PROD ACR public access for image push..."
+          az acr update \
+            --name ${ACR_NAME} \
+            --public-network-enabled true
           
-          # Extract credentials from Azure CLI login
+          echo "⏳ Waiting 20 seconds for ACR update to propagate..."
+          sleep 20
+          
+          echo "✅ PROD ACR public access temporarily enabled"
+
+      - name: Login to ACR
+        run: |
+          echo "🔐 Logging into PROD ACR..."
+          
           CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
           CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
-          # Login to ACR using Service Principal (works with private ACR)
           echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
             --username "$CLIENT_ID" \
             --password-stdin
           
-          echo "✅ Successfully logged into private ACR"
+          echo "✅ Successfully logged into PROD ACR"
 
       - name: Tag and Push Image to ACR
         run: |
@@ -332,6 +364,16 @@ jobs:
           docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
           echo "✅ Images pushed successfully to PROD"
+
+      - name: Disable ACR Public Access
+        if: always()
+        run: |
+          echo "🔒 Re-disabling PROD ACR public access..."
+          az acr update \
+            --name ${ACR_NAME} \
+            --public-network-enabled false
+          
+          echo "✅ PROD ACR is now private again"
 
       - name: Configure Web App Managed Identity for ACR
         run: |
@@ -386,9 +428,3 @@ jobs:
           echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
-
-      - name: Post-Deployment Notification
-        if: success()
-        run: |
-          echo "📢 PROD deployment notification placeholder"
-          echo "Add Slack/Teams/Email notification here if needed"
