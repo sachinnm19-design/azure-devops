@@ -51,7 +51,7 @@ module "acr" {
   resource_group_name   = azurerm_resource_group.rg.name
   location              = var.location
   sku                   = "Basic"
-  public_access_enabled = var.environment == "prod" ? false : true
+  public_access_enabled = false  # ✅ Changed to false for all environments
 
   tags = {
     environment = var.environment
