@@ -1,96 +1,57 @@
-output "subscription_id" {
-  description = "Current Azure subscription ID"
-  value       = data.azurerm_subscription.current.subscription_id
+variable "environment" {
+  type        = string
+  description = "The name of the environment for the deployment (e.g., 'dev', 'staging', 'prod')."
 }
 
-output "tenant_id" {
-  description = "Current Azure tenant ID"
-  value       = data.azurerm_client_config.current.tenant_id
+variable "location" {
+  type        = string
+  description = "The Azure region where resources will be deployed (e.g., 'eastus', 'westus2')."
 }
 
-output "resource_group_id" {
-  description = "Resource Group ID"
-  value       = azurerm_resource_group.rg.id
+variable "resource_group_name" {
+  type        = string
+  description = "The name of the Azure Resource Group where all resources will be created."
 }
 
-output "resource_group_name" {
-  description = "Resource Group name"
-  value       = azurerm_resource_group.rg.name
+variable "acr_name" {
+  type        = string
+  description = "The name of the Azure Container Registry to be created or referenced."
 }
 
-output "acr_id" {
-  description = "ACR resource ID"
-  value       = module.acr.acr_id
+variable "app_service_plan_name" {
+  type        = string
+  description = "The name of the App Service Plan for deploying the web application."
 }
 
-output "acr_name" {
-  description = "ACR name"
-  value       = module.acr.acr_name
+variable "webapp_name" {
+  type        = string
+  description = "The name of the Azure Web App to be created within the App Service Plan."
 }
 
-output "acr_login_server" {
-  description = "ACR login server URL"
-  value       = module.acr.acr_login_server
+variable "sku_name" {
+  type        = string
+  description = "The SKU name for the App Service Plan (e.g., 'B1', 'P1V2'). Determines performance and pricing."
 }
 
-output "webapp_id" {
-  description = "Web App resource ID"
-  value       = module.app_service.webapp_id
+variable "image_name" {
+  type        = string
+  description = "The name of the container image to be deployed in the Azure Web App."
 }
 
-output "webapp_name" {
-  description = "Web App name"
-  value       = module.app_service.webapp_name
+variable "image_tag" {
+  type        = string
+  description = "The tag used to identify the version of the container image (e.g., 'latest', 'v1.0.0')."
 }
 
-output "webapp_url" {
-  description = "Web App default URL"
-  value       = "https://${module.app_service.webapp_default_hostname}"
+variable "sp_object_id" {
+  type        = string
+  description = "Object ID of the Service Principal used by Terraform"
 }
 
-output "webapp_principal_id" {
-  description = "Web App managed identity principal ID"
-  value       = module.app_service.webapp_principal_id
-}
-
-output "log_analytics_workspace_id" {
-  description = "Log Analytics Workspace ID"
-  value       = azurerm_log_analytics_workspace.law.id
-}
-
-output "log_analytics_workspace_name" {
-  description = "Log Analytics Workspace name"
-  value       = azurerm_log_analytics_workspace.law.name
-}
-
-output "app_insights_id" {
-  description = "Application Insights ID"
-  value       = azurerm_application_insights.app_insights.id
-}
-
-output "app_insights_name" {
-  description = "Application Insights name"
-  value       = azurerm_application_insights.app_insights.name
-}
-
-output "app_insights_instrumentation_key" {
-  description = "Application Insights instrumentation key"
-  value       = azurerm_application_insights.app_insights.instrumentation_key
-  sensitive   = true
-}
-
-output "app_insights_connection_string" {
-  description = "Application Insights connection string"
-  value       = azurerm_application_insights.app_insights.connection_string
-  sensitive   = true
-}
-
-output "key_vault_id" {
-  description = "Key Vault resource ID"
-  value       = azurerm_key_vault.kv.id
-}
-
-output "key_vault_uri" {
-  description = "Key Vault URI"
-  value       = azurerm_key_vault.kv.vault_uri
+variable "ip_restrictions" {
+  type = list(object({
+    ip_address = string
+  }))
+  default     = []
+  description = "List of IP addresses allowed to access the web app"
 }
