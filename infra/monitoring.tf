@@ -2,12 +2,12 @@
 # Application Insights Alerts
 ############################################
 
-# Alert for high error rate
+# Alert for high error rate (using requests/failed metric)
 resource "azurerm_monitor_metric_alert" "high_error_rate" {
   name                = "${var.webapp_name}-high-error-rate"
   resource_group_name = azurerm_resource_group.rg.name
   scopes              = [azurerm_application_insights.app_insights.id]
-  description         = "Alert when error rate exceeds 5%"
+  description         = "Alert when failed request count exceeds threshold"
   severity            = 2
   frequency           = "PT5M"
   window_size         = "PT15M"
@@ -16,9 +16,9 @@ resource "azurerm_monitor_metric_alert" "high_error_rate" {
   criteria {
     metric_namespace = "microsoft.insights/components"
     metric_name      = "requests/failed"
-    aggregation      = "Average"
+    aggregation      = "Count"  # Changed from Average to Count
     operator         = "GreaterThan"
-    threshold        = 5
+    threshold        = 10  # More than 10 failed requests
   }
 
   tags = {
@@ -31,7 +31,7 @@ resource "azurerm_monitor_metric_alert" "slow_response" {
   name                = "${var.webapp_name}-slow-response"
   resource_group_name = azurerm_resource_group.rg.name
   scopes              = [azurerm_application_insights.app_insights.id]
-  description         = "Alert when response time exceeds 2 seconds"
+  description         = "Alert when average response time exceeds 2 seconds"
   severity            = 3
   frequency           = "PT5M"
   window_size         = "PT15M"
@@ -74,7 +74,7 @@ resource "azurerm_monitor_metric_alert" "health_check_failed" {
   }
 }
 
-# Alert for high CPU usage
+# Alert for high CPU usage (corrected metric name for Linux App Service)
 resource "azurerm_monitor_metric_alert" "high_cpu" {
   name                = "${var.webapp_name}-high-cpu"
   resource_group_name = azurerm_resource_group.rg.name
@@ -87,10 +87,10 @@ resource "azurerm_monitor_metric_alert" "high_cpu" {
 
   criteria {
     metric_namespace = "Microsoft.Web/sites"
-    metric_name      = "CpuPercentage"
-    aggregation      = "Average"
+    metric_name      = "CpuTime"  # Changed from CpuPercentage
+    aggregation      = "Total"
     operator         = "GreaterThan"
-    threshold        = 80
+    threshold        = 120  # 120 seconds of CPU time in 15 minutes
   }
 
   tags = {
@@ -98,12 +98,12 @@ resource "azurerm_monitor_metric_alert" "high_cpu" {
   }
 }
 
-# Alert for high memory usage
+# Alert for high memory usage (corrected metric name for Linux App Service)
 resource "azurerm_monitor_metric_alert" "high_memory" {
   name                = "${var.webapp_name}-high-memory"
   resource_group_name = azurerm_resource_group.rg.name
   scopes              = [module.app_service.webapp_id]
-  description         = "Alert when memory usage exceeds 80%"
+  description         = "Alert when memory usage exceeds threshold"
   severity            = 2
   frequency           = "PT5M"
   window_size         = "PT15M"
@@ -111,10 +111,58 @@ resource "azurerm_monitor_metric_alert" "high_memory" {
 
   criteria {
     metric_namespace = "Microsoft.Web/sites"
-    metric_name      = "MemoryPercentage"
+    metric_name      = "MemoryWorkingSet"  # Changed from MemoryPercentage
     aggregation      = "Average"
     operator         = "GreaterThan"
-    threshold        = 80
+    threshold        = 1073741824  # 1GB in bytes
+  }
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+# Alert for HTTP server errors (5xx)
+resource "azurerm_monitor_metric_alert" "http_5xx_errors" {
+  name                = "${var.webapp_name}-http-5xx-errors"
+  resource_group_name = azurerm_resource_group.rg.name
+  scopes              = [module.app_service.webapp_id]
+  description         = "Alert when HTTP 5xx errors exceed threshold"
+  severity            = 2
+  frequency           = "PT5M"
+  window_size         = "PT15M"
+  enabled             = var.environment == "prod" ? true : false
+
+  criteria {
+    metric_namespace = "Microsoft.Web/sites"
+    metric_name      = "Http5xx"
+    aggregation      = "Total"
+    operator         = "GreaterThan"
+    threshold        = 10
+  }
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+# Alert for response time (App Service metric)
+resource "azurerm_monitor_metric_alert" "response_time" {
+  name                = "${var.webapp_name}-response-time"
+  resource_group_name = azurerm_resource_group.rg.name
+  scopes              = [module.app_service.webapp_id]
+  description         = "Alert when average response time exceeds threshold"
+  severity            = 3
+  frequency           = "PT5M"
+  window_size         = "PT15M"
+  enabled             = var.environment == "prod" ? true : false
+
+  criteria {
+    metric_namespace = "Microsoft.Web/sites"
+    metric_name      = "AverageResponseTime"
+    aggregation      = "Average"
+    operator         = "GreaterThan"
+    threshold        = 2  # 2 seconds
   }
 
   tags = {
