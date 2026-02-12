@@ -12,6 +12,21 @@ resource "azurerm_resource_group" "rg" {
 }
 
 ############################################
+# Log Analytics Workspace
+############################################
+resource "azurerm_log_analytics_workspace" "law" {
+  name                = "${var.webapp_name}-law"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+
+  tags = {
+    environment = var.environment
+  }
+}
+
+############################################
 # Application Insights
 ############################################
 resource "azurerm_application_insights" "app_insights" {
@@ -19,6 +34,7 @@ resource "azurerm_application_insights" "app_insights" {
   location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
   application_type    = "web"
+  workspace_id        = azurerm_log_analytics_workspace.law.id
 
   tags = {
     environment = var.environment
@@ -31,10 +47,10 @@ resource "azurerm_application_insights" "app_insights" {
 module "acr" {
   source = "./modules/acr"
 
-  acr_name            = var.acr_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  sku                 = "Basic"
+  acr_name              = var.acr_name
+  resource_group_name   = azurerm_resource_group.rg.name
+  location              = var.location
+  sku                   = "Basic"
   public_access_enabled = var.environment == "prod" ? false : true
 
   tags = {
@@ -72,11 +88,11 @@ module "app_service" {
   image_name            = var.image_name
   image_tag             = var.image_tag
   acr_login_server      = module.acr.acr_login_server
+  environment           = var.environment
   
   app_insights_key               = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
   
-  # ADD THIS:
   ip_restrictions = [
     {
       ip_address = "2.223.114.28"

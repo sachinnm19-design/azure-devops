@@ -53,6 +53,26 @@ output "webapp_principal_id" {
   value       = module.app_service.webapp_principal_id
 }
 
+output "log_analytics_workspace_id" {
+  description = "Log Analytics Workspace ID"
+  value       = azurerm_log_analytics_workspace.law.id
+}
+
+output "log_analytics_workspace_name" {
+  description = "Log Analytics Workspace name"
+  value       = azurerm_log_analytics_workspace.law.name
+}
+
+output "app_insights_id" {
+  description = "Application Insights ID"
+  value       = azurerm_application_insights.app_insights.id
+}
+
+output "app_insights_name" {
+  description = "Application Insights name"
+  value       = azurerm_application_insights.app_insights.name
+}
+
 output "app_insights_instrumentation_key" {
   description = "Application Insights instrumentation key"
   value       = azurerm_application_insights.app_insights.instrumentation_key
