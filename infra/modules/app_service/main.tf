@@ -34,6 +34,8 @@ resource "azurerm_linux_web_app" "webapp" {
       }
     }
     
+	ip_restriction_default_action = length(var.ip_restrictions) > 0 ? "Deny" : "Allow"
+	
     minimum_tls_version = "1.2"
   }
 
