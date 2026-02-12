@@ -50,8 +50,8 @@ module "acr" {
   acr_name              = var.acr_name
   resource_group_name   = azurerm_resource_group.rg.name
   location              = var.location
-  sku                   = "Basic"
-  public_access_enabled = false  # ✅ Changed to false for all environments
+  sku                   = "Premium"  # ✅ Changed from "Basic" to "Premium"
+  public_access_enabled = false      # ✅ Set to false to disable public access
 
   tags = {
     environment = var.environment
@@ -146,8 +146,17 @@ resource "azurerm_key_vault_access_policy" "webapp_kv_access" {
 ############################################
 # Role Assignments
 ############################################
+
+# Allow Web App to pull images from ACR
 resource "azurerm_role_assignment" "webapp_acr_pull" {
   scope                = module.acr.acr_id
   role_definition_name = "AcrPull"
   principal_id         = module.app_service.webapp_principal_id
+}
+
+# Allow GitHub Actions Service Principal to push images to ACR
+resource "azurerm_role_assignment" "github_actions_acr_push" {
+  scope                = module.acr.acr_id
+  role_definition_name = "AcrPush"
+  principal_id         = var.sp_object_id  # ✅ Added - GitHub Actions needs push access
 }
