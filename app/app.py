@@ -68,7 +68,8 @@ def home():
         "version": APP_VERSION,
         "endpoints": {
             "health": "/health",
-            "home": "/"
+            "home": "/",
+            "info": "/info"
         }
     }), 200
 
