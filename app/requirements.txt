@@ -1,1 +1,5 @@
-flask==3.0.0
+Flask==2.3.2
+gunicorn==21.2.0
+opencensus-ext-azure==1.1.9
+opencensus-ext-flask==0.7.6
+opencensus-ext-logging==0.1.1
