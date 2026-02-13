@@ -114,8 +114,7 @@ resource "azurerm_key_vault" "kv" {
   sku_name            = "standard"
   tenant_id           = data.azurerm_client_config.current.tenant_id
 
-  # ✅ ENABLE RBAC Authorization (instead of Access Policies)
-  enable_rbac_authorization = true
+  enable_rbac_authorization = false
   purge_protection_enabled  = false
 
   tags = {
@@ -124,28 +123,28 @@ resource "azurerm_key_vault" "kv" {
 }
 
 ############################################
-# Role Assignments for Key Vault (RBAC)
+# Key Vault Access Policies
 ############################################
+resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
+  key_vault_id = azurerm_key_vault.kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = var.sp_object_id
 
-# ✅ RBAC: Allow Terraform Service Principal to manage Key Vault
-resource "azurerm_role_assignment" "terraform_kv_admin" {
-  scope              = azurerm_key_vault.kv.id
-  role_definition_name = "Key Vault Administrator"
-  principal_id       = var.sp_object_id
-
-  # Prevent issues with existing resources
-  skip_service_principal_aad_check = true
+  secret_permissions = [
+    "Get", "List", "Set", "Delete", "Recover", "Purge"
+  ]
 }
 
-# ✅ RBAC: Allow Web App Managed Identity to read secrets from Key Vault
-resource "azurerm_role_assignment" "webapp_kv_secrets_user" {
-  scope              = azurerm_key_vault.kv.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id       = module.app_service.webapp_principal_id
+resource "azurerm_key_vault_access_policy" "webapp_kv_access" {
+  key_vault_id = azurerm_key_vault.kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = module.app_service.webapp_principal_id
+
+  secret_permissions = ["Get", "List"]
 }
 
 ############################################
-# Role Assignments for ACR
+# Role Assignments
 ############################################
 
 # Allow Web App to pull images from ACR
@@ -159,8 +158,5 @@ resource "azurerm_role_assignment" "webapp_acr_pull" {
 resource "azurerm_role_assignment" "github_actions_acr_push" {
   scope                = module.acr.acr_id
   role_definition_name = "AcrPush"
-  principal_id         = var.sp_object_id
-  
-  # Prevent issues with existing resources
-  skip_service_principal_aad_check = true
+  principal_id         = var.sp_object_id  # ✅ Added - GitHub Actions needs push access
 }
