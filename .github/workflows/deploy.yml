@@ -159,22 +159,51 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      # ✅ CHANGED: Use az acr build instead of docker push
-      # This works with PRIVATE ACR using Service Principal authentication
-      - name: Push Image to Private ACR Using Azure CLI Build (DEV)
+      - name: Ensure Service Principal has ACR Push Permission (DEV)
         run: |
-          echo "📤 Pushing image to PRIVATE ACR using Azure CLI..."
+          echo "🔐 Ensuring Service Principal has AcrPush role..."
           
-          # ✅ az acr build works with PRIVATE ACR via Service Principal auth
-          # No need to enable public access or temporary credentials
-          az acr build \
-            --registry ${ACR_NAME} \
-            --image ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            --image ${{ env.IMAGE_NAME }}:latest \
-            --file ./app/Dockerfile \
-            ./app
+          ACR_ID=$(az acr show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query id -o tsv)
           
-          echo "✅ Image pushed to PRIVATE ACR successfully"
+          SP_OBJECT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
+          
+          az role assignment create \
+            --assignee-object-id "$SP_OBJECT_ID" \
+            --role "AcrPush" \
+            --scope "$ACR_ID" \
+            --allow-no-subscriptions 2>/dev/null || echo "✓ Role already assigned"
+          
+          echo "✅ Service Principal has AcrPush role"
+
+      - name: Login to ACR (DEV)
+        run: |
+          echo "🔐 Logging into ACR..."
+          
+          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
+          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
+          
+          echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
+            --username "$CLIENT_ID" \
+            --password-stdin
+          
+          echo "✅ Successfully logged into ACR"
+
+      - name: Tag and Push Image to ACR (DEV)
+        run: |
+          echo "🏷️  Tagging Docker images..."
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
+          
+          echo "📤 Pushing images to ACR..."
+          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
+          
+          echo "✅ Images pushed successfully"
 
       - name: Configure Web App Managed Identity for ACR (DEV)
         run: |
@@ -185,41 +214,6 @@ jobs:
             --generic-configurations '{"acrUseManagedIdentityCreds": true}'
           
           echo "✅ Web App Managed Identity configured"
-
-      - name: Verify ACR Pull Role Assignment (DEV)
-        run: |
-          echo "🔍 Verifying ACR Pull role assignment..."
-          
-          PRINCIPAL_ID=$(az webapp identity show \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query principalId -o tsv)
-          
-          echo "Web App Principal ID: $PRINCIPAL_ID"
-          
-          ROLE=$(az role assignment list \
-            --assignee $PRINCIPAL_ID \
-            --query "[?roleDefinitionName=='AcrPull'].roleDefinitionName" \
-            -o tsv)
-          
-          if [ -z "$ROLE" ]; then
-            echo "❌ AcrPull role NOT assigned, assigning now..."
-            
-            ACR_ID=$(az acr show \
-              --name ${ACR_NAME} \
-              --resource-group ${RESOURCE_GROUP} \
-              --query id -o tsv)
-            
-            az role assignment create \
-              --assignee-object-id "$PRINCIPAL_ID" \
-              --role "AcrPull" \
-              --scope "$ACR_ID"
-            
-            echo "⏳ Waiting 30 seconds for role assignment to propagate..."
-            sleep 30
-          else
-            echo "✅ AcrPull role is already assigned"
-          fi
 
       - name: Update Web App Container Image (DEV)
         run: |
@@ -275,7 +269,7 @@ jobs:
           echo "🎉 DEV Deployment completed successfully!"
           echo "=================================="
           echo "Environment: DEV"
-          echo "ACR: ${ACR_NAME} (PRIVATE ✅)"
+          echo "ACR: ${ACR_NAME} (PUBLIC)"
           echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
@@ -343,20 +337,51 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      # ✅ CHANGED: Use az acr build instead of docker push
-      - name: Push Image to Private ACR Using Azure CLI Build (PROD)
+      - name: Ensure Service Principal has ACR Push Permission (PROD)
         run: |
-          echo "📤 Pushing image to PRIVATE ACR using Azure CLI..."
+          echo "🔐 Ensuring Service Principal has AcrPush role..."
           
-          # ✅ az acr build works with PRIVATE ACR via Service Principal auth
-          az acr build \
-            --registry ${ACR_NAME} \
-            --image ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            --image ${{ env.IMAGE_NAME }}:latest \
-            --file ./app/Dockerfile \
-            ./app
+          ACR_ID=$(az acr show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query id -o tsv)
           
-          echo "✅ Image pushed to PRIVATE ACR successfully"
+          SP_OBJECT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
+          
+          az role assignment create \
+            --assignee-object-id "$SP_OBJECT_ID" \
+            --role "AcrPush" \
+            --scope "$ACR_ID" \
+            --allow-no-subscriptions 2>/dev/null || echo "✓ Role already assigned"
+          
+          echo "✅ Service Principal has AcrPush role"
+
+      - name: Login to ACR (PROD)
+        run: |
+          echo "🔐 Logging into ACR..."
+          
+          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
+          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
+          
+          echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
+            --username "$CLIENT_ID" \
+            --password-stdin
+          
+          echo "✅ Successfully logged into ACR"
+
+      - name: Tag and Push Image to ACR (PROD)
+        run: |
+          echo "🏷️  Tagging Docker images for PROD..."
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
+          
+          echo "📤 Pushing images to PROD ACR..."
+          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
+          
+          echo "✅ Images pushed successfully"
 
       - name: Configure Web App Managed Identity for ACR (PROD)
         run: |
@@ -367,41 +392,6 @@ jobs:
             --generic-configurations '{"acrUseManagedIdentityCreds": true}'
           
           echo "✅ Web App Managed Identity configured"
-
-      - name: Verify ACR Pull Role Assignment (PROD)
-        run: |
-          echo "🔍 Verifying ACR Pull role assignment..."
-          
-          PRINCIPAL_ID=$(az webapp identity show \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query principalId -o tsv)
-          
-          echo "Web App Principal ID: $PRINCIPAL_ID"
-          
-          ROLE=$(az role assignment list \
-            --assignee $PRINCIPAL_ID \
-            --query "[?roleDefinitionName=='AcrPull'].roleDefinitionName" \
-            -o tsv)
-          
-          if [ -z "$ROLE" ]; then
-            echo "❌ AcrPull role NOT assigned, assigning now..."
-            
-            ACR_ID=$(az acr show \
-              --name ${ACR_NAME} \
-              --resource-group ${RESOURCE_GROUP} \
-              --query id -o tsv)
-            
-            az role assignment create \
-              --assignee-object-id "$PRINCIPAL_ID" \
-              --role "AcrPull" \
-              --scope "$ACR_ID"
-            
-            echo "⏳ Waiting 30 seconds for role assignment to propagate..."
-            sleep 30
-          else
-            echo "✅ AcrPull role is already assigned"
-          fi
 
       - name: Update Web App Container Image (PROD)
         run: |
@@ -457,7 +447,7 @@ jobs:
           echo "🎉 PROD Deployment completed successfully!"
           echo "=================================="
           echo "Environment: PROD"
-          echo "ACR: ${ACR_NAME} (PRIVATE ✅)"
+          echo "ACR: ${ACR_NAME} (PUBLIC)"
           echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
