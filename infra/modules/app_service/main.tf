@@ -38,6 +38,7 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   site_config {
+    # ✅ Docker configuration via application_stack
     application_stack {
       docker_image_name   = "${var.image_name}:${var.image_tag}"
       docker_registry_url = "https://${var.acr_login_server}"
@@ -79,7 +80,7 @@ resource "azurerm_linux_web_app" "webapp" {
     ftps_state          = "Disabled"
   }
 
-  # ✅ App Settings for Managed Identity
+  # ✅ App Settings (WITHOUT Docker registry settings)
   app_settings = merge(
     {
       "WEBSITES_ENABLE_APP_SERVICE_STORAGE"       = "false"
@@ -91,11 +92,9 @@ resource "azurerm_linux_web_app" "webapp" {
       "APPINSIGHTS_PROFILER_ENABLED"              = "1"
       "APPINSIGHTS_SNAPSHOT_DEBUGGER_ENABLED"     = "0"
       
-      # ✅ Docker Registry settings for Managed Identity
-      "DOCKER_REGISTRY_SERVER_URL"                = "https://${var.acr_login_server}"
-      "DOCKER_ENABLE_CI"                          = "true"
-      # ✅ KEY: Not setting DOCKER_REGISTRY_SERVER_USERNAME or PASSWORD
-      # This forces Azure to use Managed Identity for authentication
+      # ❌ REMOVED: DOCKER_REGISTRY_SERVER_URL (conflicts with application_stack)
+      # ❌ REMOVED: DOCKER_ENABLE_CI (not needed with application_stack)
+      # GitHub Actions workflow handles docker registry setup via az webapp config
       
       # Application settings
       "ENVIRONMENT"                               = var.environment
