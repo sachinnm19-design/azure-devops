@@ -182,7 +182,6 @@ jobs:
         run: |
           echo "🔧 Configuring ACR network rules to allow public access..."
           
-          # Set default action to Allow (for Premium SKU)
           az acr update \
             --name ${ACR_NAME} \
             --default-action Allow 2>/dev/null || echo "✓ Network rules configured or not Premium SKU"
@@ -228,16 +227,6 @@ jobs:
           
           echo "✅ Images pushed successfully"
 
-      - name: Disable ACR Public Access (DEV)
-        if: always()
-        run: |
-          echo "🔒 Disabling ACR public access (making private again)..."
-          az acr update \
-            --name ${ACR_NAME} \
-            --public-network-enabled false
-          
-          echo "✅ ACR is now private again"
-
       - name: Configure Web App Managed Identity for ACR (DEV)
         run: |
           echo "🔧 Configuring Web App to use Managed Identity for ACR..."
@@ -264,10 +253,22 @@ jobs:
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP"
 
-      - name: Wait for App Startup (DEV)
+      - name: Wait for App Startup and Image Pull (DEV)
         run: |
-          echo "⏳ Waiting 30 seconds for app to start..."
-          sleep 30
+          echo "⏳ Waiting 40 seconds for app to start and pull image from ACR..."
+          sleep 40
+          
+          echo "✅ App should have pulled the image by now"
+
+      - name: Disable ACR Public Access (DEV)
+        run: |
+          echo "🔒 Disabling ACR public access (making private again)..."
+          echo "ℹ️  Web App has already pulled the image using Managed Identity"
+          az acr update \
+            --name ${ACR_NAME} \
+            --public-network-enabled false
+          
+          echo "✅ ACR is now private again"
 
       - name: Health Check (DEV)
         run: |
@@ -381,7 +382,6 @@ jobs:
         run: |
           echo "🔧 Configuring ACR network rules to allow public access..."
           
-          # Set default action to Allow (for Premium SKU)
           az acr update \
             --name ${ACR_NAME} \
             --default-action Allow 2>/dev/null || echo "✓ Network rules configured or not Premium SKU"
@@ -427,16 +427,6 @@ jobs:
           
           echo "✅ Images pushed successfully"
 
-      - name: Disable ACR Public Access (PROD)
-        if: always()
-        run: |
-          echo "🔒 Disabling ACR public access (making private again)..."
-          az acr update \
-            --name ${ACR_NAME} \
-            --public-network-enabled false
-          
-          echo "✅ ACR is now private again"
-
       - name: Configure Web App Managed Identity for ACR (PROD)
         run: |
           echo "🔧 Configuring Web App to use Managed Identity for ACR..."
@@ -463,10 +453,22 @@ jobs:
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP"
 
-      - name: Wait for App Startup (PROD)
+      - name: Wait for App Startup and Image Pull (PROD)
         run: |
-          echo "⏳ Waiting 30 seconds for app to start..."
-          sleep 30
+          echo "⏳ Waiting 40 seconds for app to start and pull image from ACR..."
+          sleep 40
+          
+          echo "✅ App should have pulled the image by now"
+
+      - name: Disable ACR Public Access (PROD)
+        run: |
+          echo "🔒 Disabling ACR public access (making private again)..."
+          echo "ℹ️  Web App has already pulled the image using Managed Identity"
+          az acr update \
+            --name ${ACR_NAME} \
+            --public-network-enabled false
+          
+          echo "✅ ACR is now private again"
 
       - name: Health Check (PROD)
         run: |
