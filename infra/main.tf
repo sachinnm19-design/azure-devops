@@ -50,8 +50,8 @@ module "acr" {
   acr_name              = var.acr_name
   resource_group_name   = azurerm_resource_group.rg.name
   location              = var.location
-  sku                   = "Premium"  # ✅ Premium for better security features
-  public_access_enabled = false      # ✅ Disable public access - use private endpoint
+  sku                   = "Premium"  # ✅ Premium for better features
+  public_access_enabled = true       # ✅ PUBLIC
 
   tags = {
     environment = var.environment
@@ -117,7 +117,7 @@ resource "azurerm_role_assignment" "webapp_acr_pull" {
   description = "Allow Web App to pull container images from ACR using Managed Identity"
 }
 
-# ✅ Allow Terraform Service Principal to push/manage images in ACR
+# ✅ Allow GitHub Actions Service Principal to push images in ACR
 resource "azurerm_role_assignment" "github_actions_acr_push" {
   scope              = module.acr.acr_id
   role_definition_name = "AcrPush"
