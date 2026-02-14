@@ -48,10 +48,10 @@ output "webapp_url" {
   value       = "https://${module.app_service.webapp_default_hostname}"
 }
 
+# ✅ FIXED: Removed duplicate description - only one description per output!
 output "webapp_principal_id" {
-  description = "Web App managed identity principal ID"
+  description = "Web App managed identity principal ID - use this ID to grant permissions to resources via RBAC"
   value       = module.app_service.webapp_principal_id
-  description = "Use this ID to grant permissions to resources via RBAC"
 }
 
 output "log_analytics_workspace_id" {
