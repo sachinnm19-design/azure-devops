@@ -33,9 +33,9 @@ jobs:
 
       - name: Test Container Locally
         run: |
-          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker run -d -p 5000:5000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           sleep 10
-          curl -f http://localhost:3000/health || exit 1
+          curl -f http://localhost:5000/health || exit 1
           docker stop test-app
 
       - name: Save Docker Image
@@ -107,6 +107,10 @@ jobs:
     environment: dev
 
     env:
+      RESOURCE_GROUP: devops-demo-rg-dev
+      WEBAPP_NAME: devops-demo-webapp-dev
+      ACR_NAME: devopsdemoacrdev
+      ACR_LOGIN_SERVER: devopsdemoacrdev.azurecr.io
       TF_WORKSPACE: dev
 
     steps:
@@ -126,154 +130,124 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Configure Terraform Cloud Token
-        run: |
-          cat > ~/.terraformrc <<'EOF'
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOF
-
-      - name: Terraform Init
-        working-directory: infra
-        run: terraform init -upgrade
-
-      - name: Terraform Plan
-        working-directory: infra
-        run: terraform plan
-
-      - name: Terraform Apply
-        working-directory: infra
-        run: terraform apply -auto-approve
-
-      - name: Export Terraform Outputs
-        working-directory: infra
-        run: |
-          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
-
-      - name: Temporarily Enable ACR Public Access
-        run: |
-          echo "🔓 Temporarily enabling ACR public access for image push..."
-          az acr update \
-            --name ${ACR_NAME} \
-            --public-network-enabled true
-          
-          echo "⏳ Waiting 20 seconds for ACR update to propagate..."
-          sleep 20
-          
-          echo "✅ ACR public access temporarily enabled"
-
       - name: Login to ACR
         run: |
-          echo "🔐 Logging into ACR..."
+          echo "🔐 Logging into DEV ACR..."
           
-          # Extract credentials from Azure CLI login
           CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
           CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
-          # Login to ACR using Service Principal
           echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
             --username "$CLIENT_ID" \
             --password-stdin
           
-          echo "✅ Successfully logged into ACR"
+          echo "✅ Successfully logged into DEV ACR"
 
       - name: Tag and Push Image to ACR
         run: |
-          echo "🏷️  Tagging Docker images..."
+          echo "🏷️  Tagging Docker images for DEV..."
           docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
-          echo "📤 Pushing images to ACR..."
+          echo "📤 Pushing images to DEV ACR..."
           docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
-          echo "✅ Images pushed successfully"
+          echo "✅ Images pushed successfully to DEV"
 
-      - name: Disable ACR Public Access
-        if: always()
+      # ✅ KEY FIX: Configure Web App Managed Identity for ACR (DEV)
+      - name: Configure Web App Managed Identity for ACR (DEV)
         run: |
-          echo "🔒 Re-disabling ACR public access..."
-          az acr update \
-            --name ${ACR_NAME} \
-            --public-network-enabled false
-          
-          echo "✅ ACR is now private again"
-
-      - name: Configure Web App Managed Identity for ACR
-        run: |
-          echo "🔧 Configuring Web App to use Managed Identity for ACR..."
+          echo "🔧 Configuring DEV Web App to use Managed Identity for ACR..."
           az webapp config set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
             --generic-configurations '{"acrUseManagedIdentityCreds": true}'
+          
+          echo "✅ DEV Web App Managed Identity for ACR configured"
 
-      - name: Update Web App Container Image
+      - name: Update Web App Container Image (DEV)
         run: |
-          echo "🔄 Updating Web App container image..."
+          echo "🔄 Updating DEV Web App container image..."
           az webapp config container set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --docker-custom-image-name "${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+            --docker-custom-image-name "${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" \
+            --docker-registry-server-url "https://${ACR_LOGIN_SERVER}"
 
-      - name: Restart Web App
+      - name: Restart Web App (DEV)
         run: |
-          echo "♻️  Restarting Web App..."
+          echo "♻️  Restarting DEV Web App..."
           az webapp restart \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP"
 
       - name: Wait for App Startup
         run: |
-          echo "⏳ Waiting 30 seconds for app to start..."
+          echo "⏳ Waiting 30 seconds for DEV app to start..."
           sleep 30
 
-      - name: Health Check
+      - name: Health Check (DEV)
         run: |
-          echo "⚠️  Health check skipped - Web App is IP-restricted"
-          echo "✅ Please verify manually from: https://${WEBAPP_NAME}.azurewebsites.net/health"
+          echo "🏥 Running health check on DEV Web App..."
+          
+          # Get the Web App URL
+          WEBAPP_URL=$(az webapp show \
+            --name $WEBAPP_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --query defaultHostName -o tsv)
+          
+          echo "Health check URL: https://$WEBAPP_URL/health"
+          
+          # Try health check (may fail if IP-restricted)
+          if curl -f https://$WEBAPP_URL/health; then
+            echo "✅ Health check passed!"
+          else
+            echo "⚠️  Health check failed - This is expected if your IP is restricted"
+            echo "Manual verification: https://$WEBAPP_URL/health"
+          fi
 
-      - name: View Application Logs
+      - name: View Application Logs (DEV)
         if: always()
         continue-on-error: true
         run: |
-          echo "📋 Fetching application logs..."
+          echo "📋 Fetching DEV application logs..."
           az webapp log tail \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
             --timeout 30 || echo "⚠️  Could not fetch logs (might be IP-restricted)"
 
-      - name: Deployment Summary
+      - name: Deployment Summary (DEV)
         if: success()
         run: |
           echo "🎉 DEV Deployment completed successfully!"
           echo "=================================="
           echo "Environment: DEV"
-          echo "ACR: ${ACR_NAME}"
+          echo "Resource Group: ${{ env.RESOURCE_GROUP }}"
+          echo "Web App: ${{ env.WEBAPP_NAME }}"
+          echo "ACR: ${{ env.ACR_NAME }}"
           echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
-          echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
+          echo "=================================="
 
 # =====================================================
-# STAGE 4: DEPLOY TO PROD (MANUAL APPROVAL)
+# STAGE 4: DEPLOY TO PROD (Optional - Manual Trigger)
 # =====================================================
   deploy-prod:
     name: Deploy to PROD
-    needs: deploy-dev
+    needs: [build, security-scan, deploy-dev]
     runs-on: ubuntu-latest
-    environment: prod
+    environment: 
+      name: prod
+      # Requires manual approval before deploying to prod
+    if: github.ref == 'refs/heads/main'
 
     env:
+      RESOURCE_GROUP: devops-demo-rg-prod
+      WEBAPP_NAME: devops-demo-webapp-prod
+      ACR_NAME: devopsdemoacrprod
+      ACR_LOGIN_SERVER: devopsdemoacrprod.azurecr.io
       TF_WORKSPACE: prod
 
     steps:
@@ -292,51 +266,6 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Configure Terraform Cloud Token
-        run: |
-          cat > ~/.terraformrc <<'EOF'
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOF
-
-      - name: Terraform Init
-        working-directory: infra
-        run: terraform init -upgrade
-
-      - name: Terraform Plan
-        working-directory: infra
-        run: terraform plan
-
-      - name: Terraform Apply
-        working-directory: infra
-        run: terraform apply -auto-approve
-
-      - name: Export Terraform Outputs
-        working-directory: infra
-        run: |
-          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
-
-      - name: Temporarily Enable ACR Public Access
-        run: |
-          echo "🔓 Temporarily enabling PROD ACR public access for image push..."
-          az acr update \
-            --name ${ACR_NAME} \
-            --public-network-enabled true
-          
-          echo "⏳ Waiting 20 seconds for ACR update to propagate..."
-          sleep 20
-          
-          echo "✅ PROD ACR public access temporarily enabled"
 
       - name: Login to ACR
         run: |
@@ -365,33 +294,27 @@ jobs:
           
           echo "✅ Images pushed successfully to PROD"
 
-      - name: Disable ACR Public Access
-        if: always()
-        run: |
-          echo "🔒 Re-disabling PROD ACR public access..."
-          az acr update \
-            --name ${ACR_NAME} \
-            --public-network-enabled false
-          
-          echo "✅ PROD ACR is now private again"
-
-      - name: Configure Web App Managed Identity for ACR
+      # ✅ Configure Web App Managed Identity for ACR (PROD)
+      - name: Configure Web App Managed Identity for ACR (PROD)
         run: |
           echo "🔧 Configuring PROD Web App to use Managed Identity for ACR..."
           az webapp config set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
             --generic-configurations '{"acrUseManagedIdentityCreds": true}'
+          
+          echo "✅ PROD Web App Managed Identity for ACR configured"
 
-      - name: Update Web App Container Image
+      - name: Update Web App Container Image (PROD)
         run: |
           echo "🔄 Updating PROD Web App container image..."
           az webapp config container set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --docker-custom-image-name "${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+            --docker-custom-image-name "${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" \
+            --docker-registry-server-url "https://${ACR_LOGIN_SERVER}"
 
-      - name: Restart Web App
+      - name: Restart Web App (PROD)
         run: |
           echo "♻️  Restarting PROD Web App..."
           az webapp restart \
@@ -403,12 +326,25 @@ jobs:
           echo "⏳ Waiting 30 seconds for PROD app to start..."
           sleep 30
 
-      - name: Health Check
+      - name: Health Check (PROD)
         run: |
-          echo "⚠️  Health check skipped - Web App is IP-restricted"
-          echo "✅ Please verify manually from: https://${WEBAPP_NAME}.azurewebsites.net/health"
+          echo "🏥 Running health check on PROD Web App..."
+          
+          WEBAPP_URL=$(az webapp show \
+            --name $WEBAPP_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --query defaultHostName -o tsv)
+          
+          echo "Health check URL: https://$WEBAPP_URL/health"
+          
+          if curl -f https://$WEBAPP_URL/health; then
+            echo "✅ Health check passed!"
+          else
+            echo "⚠️  Health check failed - This is expected if your IP is restricted"
+            echo "Manual verification: https://$WEBAPP_URL/health"
+          fi
 
-      - name: View Application Logs
+      - name: View Application Logs (PROD)
         if: always()
         continue-on-error: true
         run: |
@@ -418,13 +354,14 @@ jobs:
             --resource-group "$RESOURCE_GROUP" \
             --timeout 30 || echo "⚠️  Could not fetch logs (might be IP-restricted)"
 
-      - name: Deployment Summary
+      - name: Deployment Summary (PROD)
         if: success()
         run: |
           echo "🎉 PROD Deployment completed successfully!"
           echo "=================================="
           echo "Environment: PROD"
-          echo "ACR: ${ACR_NAME}"
+          echo "Resource Group: ${{ env.RESOURCE_GROUP }}"
+          echo "Web App: ${{ env.WEBAPP_NAME }}"
+          echo "ACR: ${{ env.ACR_NAME }}"
           echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
-          echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
+          echo "=================================="

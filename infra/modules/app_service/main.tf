@@ -15,6 +15,7 @@ resource "azurerm_linux_web_app" "webapp" {
   service_plan_id     = azurerm_service_plan.asp.id
   https_only          = true
 
+  # ✅ System-Assigned Managed Identity (for ACR access)
   identity {
     type = "SystemAssigned"
   }
@@ -25,7 +26,7 @@ resource "azurerm_linux_web_app" "webapp" {
     failed_request_tracing  = true
 
     application_logs {
-      file_system_level = "Information"  # Options: Off, Error, Warning, Information, Verbose
+      file_system_level = "Information"
     }
 
     http_logs {
@@ -40,9 +41,10 @@ resource "azurerm_linux_web_app" "webapp" {
     application_stack {
       docker_image_name   = "${var.image_name}:${var.image_tag}"
       docker_registry_url = "https://${var.acr_login_server}"
+      # ✅ NO username/password - Managed Identity will handle authentication
     }
     
-    # IP restrictions (if provided)
+    # IP restrictions
     dynamic "ip_restriction" {
       for_each = var.ip_restrictions
       content {
@@ -77,6 +79,7 @@ resource "azurerm_linux_web_app" "webapp" {
     ftps_state          = "Disabled"
   }
 
+  # ✅ App Settings for Managed Identity
   app_settings = merge(
     {
       "WEBSITES_ENABLE_APP_SERVICE_STORAGE"       = "false"
@@ -87,6 +90,12 @@ resource "azurerm_linux_web_app" "webapp" {
       "APPLICATIONINSIGHTS_SAMPLING_PERCENTAGE"   = var.environment == "prod" ? "20" : "100"
       "APPINSIGHTS_PROFILER_ENABLED"              = "1"
       "APPINSIGHTS_SNAPSHOT_DEBUGGER_ENABLED"     = "0"
+      
+      # ✅ Docker Registry settings for Managed Identity
+      "DOCKER_REGISTRY_SERVER_URL"                = "https://${var.acr_login_server}"
+      "DOCKER_ENABLE_CI"                          = "true"
+      # ✅ KEY: Not setting DOCKER_REGISTRY_SERVER_USERNAME or PASSWORD
+      # This forces Azure to use Managed Identity for authentication
       
       # Application settings
       "ENVIRONMENT"                               = var.environment

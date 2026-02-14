@@ -50,8 +50,8 @@ module "acr" {
   acr_name              = var.acr_name
   resource_group_name   = azurerm_resource_group.rg.name
   location              = var.location
-  sku                   = "Premium"  # ✅ Changed from "Basic" to "Premium"
-  public_access_enabled = false      # ✅ Set to false to disable public access
+  sku                   = "Premium"  # ✅ Premium for better security features
+  public_access_enabled = false      # ✅ Disable public access - use private endpoint
 
   tags = {
     environment = var.environment
@@ -105,58 +105,24 @@ module "app_service" {
 }
 
 ############################################
-# Key Vault
-############################################
-resource "azurerm_key_vault" "kv" {
-  name                = "${var.acr_name}-kv"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  sku_name            = "standard"
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-
-  enable_rbac_authorization = false
-  purge_protection_enabled  = false
-
-  tags = {
-    environment = var.environment
-  }
-}
-
-############################################
-# Key Vault Access Policies
-############################################
-resource "azurerm_key_vault_access_policy" "terraform_spn_access" {
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = var.sp_object_id
-
-  secret_permissions = [
-    "Get", "List", "Set", "Delete", "Recover", "Purge"
-  ]
-}
-
-resource "azurerm_key_vault_access_policy" "webapp_kv_access" {
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = module.app_service.webapp_principal_id
-
-  secret_permissions = ["Get", "List"]
-}
-
-############################################
-# Role Assignments
+# Role Assignments for ACR (RBAC)
 ############################################
 
-# Allow Web App to pull images from ACR
+# ✅ Allow Web App Managed Identity to pull images from ACR
 resource "azurerm_role_assignment" "webapp_acr_pull" {
-  scope                = module.acr.acr_id
+  scope              = module.acr.acr_id
   role_definition_name = "AcrPull"
-  principal_id         = module.app_service.webapp_principal_id
+  principal_id       = module.app_service.webapp_principal_id
+  
+  description = "Allow Web App to pull container images from ACR using Managed Identity"
 }
 
-# Allow GitHub Actions Service Principal to push images to ACR
+# ✅ Allow Terraform Service Principal to push/manage images in ACR
 resource "azurerm_role_assignment" "github_actions_acr_push" {
-  scope                = module.acr.acr_id
+  scope              = module.acr.acr_id
   role_definition_name = "AcrPush"
-  principal_id         = var.sp_object_id  # ✅ Added - GitHub Actions needs push access
+  principal_id       = var.sp_object_id
+  
+  skip_service_principal_aad_check = true
+  description = "Allow GitHub Actions to push container images to ACR"
 }

@@ -48,8 +48,9 @@ output "webapp_url" {
   value       = "https://${module.app_service.webapp_default_hostname}"
 }
 
+# ✅ FIXED: Removed duplicate description - only one description per output!
 output "webapp_principal_id" {
-  description = "Web App managed identity principal ID"
+  description = "Web App managed identity principal ID - use this ID to grant permissions to resources via RBAC"
   value       = module.app_service.webapp_principal_id
 }
 
@@ -83,14 +84,4 @@ output "app_insights_connection_string" {
   description = "Application Insights connection string"
   value       = azurerm_application_insights.app_insights.connection_string
   sensitive   = true
-}
-
-output "key_vault_id" {
-  description = "Key Vault resource ID"
-  value       = azurerm_key_vault.kv.id
-}
-
-output "key_vault_uri" {
-  description = "Key Vault URI"
-  value       = azurerm_key_vault.kv.vault_uri
 }
