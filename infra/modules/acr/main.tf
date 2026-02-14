@@ -4,10 +4,7 @@ resource "azurerm_container_registry" "acr" {
   location                      = var.location
   sku                           = var.sku
   admin_enabled                 = false
-  public_network_access_enabled = false  # ✅ PRIVATE
-  
-  # ✅ Allow Azure Services to bypass network rules
-  network_rule_bypass_option = "AzureServices"
+  public_network_access_enabled = true  # ✅ PUBLIC
 
   tags = var.tags
 }
