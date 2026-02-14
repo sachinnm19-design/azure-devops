@@ -95,7 +95,7 @@ module "app_service" {
   
   ip_restrictions = [
     {
-      ip_address = "2.223.114.28"
+      ip_address = "90.204.44.55"
     }
   ]
 
