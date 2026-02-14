@@ -51,6 +51,7 @@ output "webapp_url" {
 output "webapp_principal_id" {
   description = "Web App managed identity principal ID"
   value       = module.app_service.webapp_principal_id
+  description = "Use this ID to grant permissions to resources via RBAC"
 }
 
 output "log_analytics_workspace_id" {
@@ -83,14 +84,4 @@ output "app_insights_connection_string" {
   description = "Application Insights connection string"
   value       = azurerm_application_insights.app_insights.connection_string
   sensitive   = true
-}
-
-output "key_vault_id" {
-  description = "Key Vault resource ID"
-  value       = azurerm_key_vault.kv.id
-}
-
-output "key_vault_uri" {
-  description = "Key Vault URI"
-  value       = azurerm_key_vault.kv.vault_uri
 }
