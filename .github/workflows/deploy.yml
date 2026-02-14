@@ -33,9 +33,9 @@ jobs:
 
       - name: Test Container Locally
         run: |
-          docker run -d -p 5000:5000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           sleep 10
-          curl -f http://localhost:5000/health || exit 1
+          curl -f http://localhost:3000/health || exit 1
           docker stop test-app
 
       - name: Save Docker Image
