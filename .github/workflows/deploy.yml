@@ -460,16 +460,6 @@ jobs:
           
           echo "✅ App should have pulled the image by now"
 
-      - name: Disable ACR Public Access (PROD)
-        run: |
-          echo "🔒 Disabling ACR public access (making private again)..."
-          echo "ℹ️  Web App has already pulled the image using Managed Identity"
-          az acr update \
-            --name ${ACR_NAME} \
-            --public-network-enabled false
-          
-          echo "✅ ACR is now private again"
-
       - name: Health Check (PROD)
         run: |
           echo "⚠️  Health check skipped - Web App is IP-restricted"
