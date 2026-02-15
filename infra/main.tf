@@ -42,7 +42,7 @@ resource "azurerm_application_insights" "app_insights" {
 }
 
 ############################################
-# ACR Module
+# ACR Module - ✅ NOW USES VARIABLE
 ############################################
 module "acr" {
   source = "./modules/acr"
@@ -50,8 +50,8 @@ module "acr" {
   acr_name              = var.acr_name
   resource_group_name   = azurerm_resource_group.rg.name
   location              = var.location
-  sku                   = "Premium"  # ✅ Premium for better features
-  public_access_enabled = true       # ✅ PUBLIC
+  sku                   = "Premium"
+  public_access_enabled = var.acr_public_access_enabled  # ✅ FROM VARIABLE (controlled by pipeline)
 
   tags = {
     environment = var.environment
@@ -59,15 +59,18 @@ module "acr" {
 }
 
 ############################################
-# Networking Module
+# Networking Module - ✅ UPDATED WITH VNET VARS
 ############################################
 module "networking" {
   source = "./modules/networking"
 
-  resource_prefix     = var.webapp_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  create_nsg          = true
+  resource_prefix              = var.webapp_name
+  resource_group_name          = azurerm_resource_group.rg.name
+  location                     = var.location
+  create_nsg                   = true
+  vnet_address_space           = var.vnet_address_space           # ✅ NEW
+  app_service_subnet_prefix    = var.app_service_subnet_prefix    # ✅ NEW
+  private_endpoint_subnet_prefix = var.private_endpoint_subnet_prefix  # ✅ NEW
 
   tags = {
     environment = var.environment
@@ -75,7 +78,27 @@ module "networking" {
 }
 
 ############################################
-# App Service Module
+# Private Endpoint Module - ✅ NEW
+############################################
+module "private_endpoint" {
+  source = "./modules/private_endpoint"
+
+  acr_name                  = var.acr_name
+  acr_id                    = module.acr.acr_id
+  location                  = var.location
+  resource_group_name       = azurerm_resource_group.rg.name
+  private_endpoint_subnet_id = module.networking.private_endpoints_subnet_id
+  acr_private_dns_zone_id   = module.networking.acr_private_dns_zone_id
+
+  tags = {
+    environment = var.environment
+  }
+
+  depends_on = [module.acr, module.networking]
+}
+
+############################################
+# App Service Module - ✅ UPDATED WITH VNET INTEGRATION
 ############################################
 module "app_service" {
   source = "./modules/app_service"
@@ -88,6 +111,7 @@ module "app_service" {
   image_name            = var.image_name
   image_tag             = var.image_tag
   acr_login_server      = module.acr.acr_login_server
+  app_service_subnet_id = module.networking.app_service_subnet_id  # ✅ NEW
   environment           = var.environment
   
   app_insights_key               = azurerm_application_insights.app_insights.instrumentation_key
@@ -102,6 +126,8 @@ module "app_service" {
   tags = {
     environment = var.environment
   }
+
+  depends_on = [module.networking, module.acr]  # ✅ NEW
 }
 
 ############################################

@@ -26,8 +26,8 @@ variable "sku" {
 
 variable "public_access_enabled" {
   type        = bool
-  description = "Enable public network access (only works with Premium SKU)"
-  default     = false
+  description = "Enable public network access to ACR (will be controlled by pipeline)"
+  default     = false  # ✅ DEFAULT IS PRIVATE
 }
 
 variable "tags" {
