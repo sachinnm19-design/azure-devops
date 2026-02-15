@@ -1,4 +1,4 @@
-name: Build, Test & Deploy with ACR Management
+name: Multi-Stage CI/CD Pipeline
 
 on:
   push:
@@ -139,17 +139,17 @@ jobs:
           }
           EOF
 
-      # ============================================
-      # 🔓 ENABLE ACR PUBLIC ACCESS
-      # ============================================
-      - name: "🔓 Enable ACR Public Access (Terraform)"
+      - name: Terraform Init
         working-directory: infra
-        run: |
-          echo "🔓 Enabling ACR public access for image push..."
-          terraform init -upgrade
-          terraform plan -var="acr_public_access_enabled=true" -out=tfplan
-          terraform apply -auto-approve tfplan
-          echo "✅ ACR public access enabled"
+        run: terraform init -upgrade
+
+      - name: Terraform Plan
+        working-directory: infra
+        run: terraform plan
+
+      - name: Terraform Apply
+        working-directory: infra
+        run: terraform apply -auto-approve
 
       - name: Export Terraform Outputs
         working-directory: infra
@@ -204,18 +204,6 @@ jobs:
           docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
           echo "✅ Images pushed successfully"
-
-      # ============================================
-      # 🔒 DISABLE ACR PUBLIC ACCESS
-      # ============================================
-      - name: "🔒 Disable ACR Public Access (Terraform)"
-        if: always()  # Run even if push failed
-        working-directory: infra
-        run: |
-          echo "🔒 Disabling ACR public access for security..."
-          terraform plan -var="acr_public_access_enabled=false" -out=tfplan
-          terraform apply -auto-approve tfplan
-          echo "✅ ACR public access disabled"
 
       - name: Configure Web App Managed Identity for ACR (DEV)
         run: |
@@ -281,7 +269,7 @@ jobs:
           echo "🎉 DEV Deployment completed successfully!"
           echo "=================================="
           echo "Environment: DEV"
-          echo "ACR: ${ACR_NAME} (NOW PRIVATE)"
+          echo "ACR: ${ACR_NAME} (PUBLIC)"
           echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
@@ -329,17 +317,17 @@ jobs:
           }
           EOF
 
-      # ============================================
-      # 🔓 ENABLE ACR PUBLIC ACCESS
-      # ============================================
-      - name: "🔓 Enable ACR Public Access (Terraform)"
+      - name: Terraform Init
         working-directory: infra
-        run: |
-          echo "🔓 Enabling ACR public access for image push..."
-          terraform init -upgrade
-          terraform plan -var="acr_public_access_enabled=true" -out=tfplan
-          terraform apply -auto-approve tfplan
-          echo "✅ ACR public access enabled"
+        run: terraform init -upgrade
+
+      - name: Terraform Plan
+        working-directory: infra
+        run: terraform plan
+
+      - name: Terraform Apply
+        working-directory: infra
+        run: terraform apply -auto-approve
 
       - name: Export Terraform Outputs
         working-directory: infra
@@ -394,18 +382,6 @@ jobs:
           docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
           echo "✅ Images pushed successfully"
-
-      # ============================================
-      # 🔒 DISABLE ACR PUBLIC ACCESS
-      # ============================================
-      - name: "🔒 Disable ACR Public Access (Terraform)"
-        if: always()  # Run even if push failed
-        working-directory: infra
-        run: |
-          echo "🔒 Disabling ACR public access for security..."
-          terraform plan -var="acr_public_access_enabled=false" -out=tfplan
-          terraform apply -auto-approve tfplan
-          echo "✅ ACR public access disabled"
 
       - name: Configure Web App Managed Identity for ACR (PROD)
         run: |
@@ -471,7 +447,7 @@ jobs:
           echo "🎉 PROD Deployment completed successfully!"
           echo "=================================="
           echo "Environment: PROD"
-          echo "ACR: ${ACR_NAME} (NOW PRIVATE)"
+          echo "ACR: ${ACR_NAME} (PUBLIC)"
           echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
