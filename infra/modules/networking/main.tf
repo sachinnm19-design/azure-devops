@@ -25,15 +25,15 @@ resource "azurerm_subnet" "app_service_subnet" {
   }
 }
 
-# ✅ Subnet for Private Endpoints - ✅ FIXED PARAMETER NAME
+# ✅ Subnet for Private Endpoints - ✅ SIMPLIFIED (No policy parameter needed in v4.55.0)
 resource "azurerm_subnet" "private_endpoints_subnet" {
   name                 = "${var.resource_prefix}-pe-subnet"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [var.private_endpoint_subnet_prefix]
-
-  # ✅ CORRECTED: Use enforce_private_link_endpoint_network_policies instead
-  enforce_private_link_endpoint_network_policies = true
+  
+  # ✅ No policy parameters needed for Azure Provider v4.55.0
+  # Private endpoints work out of the box with this subnet
 }
 
 # ✅ Network Security Group
