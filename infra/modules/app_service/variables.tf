@@ -74,3 +74,9 @@ variable "tags" {
   default     = {}
   description = "Tags to apply to resources"
 }
+
+variable "app_service_subnet_id" {
+  type        = string
+  description = "Subnet ID for App Service VNET integration"
+  default     = null
+}
