@@ -25,14 +25,15 @@ resource "azurerm_subnet" "app_service_subnet" {
   }
 }
 
-# ✅ Subnet for Private Endpoints
+# ✅ Subnet for Private Endpoints - ✅ FIXED PARAMETER NAME
 resource "azurerm_subnet" "private_endpoints_subnet" {
   name                 = "${var.resource_prefix}-pe-subnet"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [var.private_endpoint_subnet_prefix]
 
-  private_endpoint_network_policies_enabled = true
+  # ✅ CORRECTED: Use enforce_private_link_endpoint_network_policies instead
+  enforce_private_link_endpoint_network_policies = true
 }
 
 # ✅ Network Security Group
