@@ -42,7 +42,7 @@ resource "azurerm_application_insights" "app_insights" {
 }
 
 ############################################
-# ACR Module
+# ACR Module - ✅ NOW USES VARIABLE
 ############################################
 module "acr" {
   source = "./modules/acr"
@@ -50,8 +50,8 @@ module "acr" {
   acr_name              = var.acr_name
   resource_group_name   = azurerm_resource_group.rg.name
   location              = var.location
-  sku                   = "Premium"  # ✅ Premium for better features
-  public_access_enabled = true       # ✅ PUBLIC
+  sku                   = "Premium"
+  public_access_enabled = var.acr_public_access_enabled  # ✅ FROM VARIABLE (controlled by pipeline)
 
   tags = {
     environment = var.environment
