@@ -9,6 +9,7 @@ on:
 env:
   IMAGE_NAME: demo-app
   IMAGE_TAG: ${{ github.sha }}
+  TF_WORKSPACE: dev
 
 jobs:
 # =====================================================
@@ -144,7 +145,7 @@ jobs:
         working-directory: infra
         run: terraform plan
 
-      - name: "✅ Terraform Apply (Create Infrastructure)"
+      - name: Terraform Apply (Create Infrastructure)
         working-directory: infra
         run: terraform apply -auto-approve
 
@@ -161,13 +162,12 @@ jobs:
       # ============================================
       - name: "🔓 Enable ACR Public Access"
         run: |
-          echo "🔓 Enabling ACR public access temporarily..."
+          echo "🔓 Enabling ACR public access for image push..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled true
           echo "✅ ACR public access enabled"
-          sleep 10
 
       - name: Ensure Service Principal has ACR Push Permission
         run: |
@@ -221,53 +221,12 @@ jobs:
       - name: "🔒 Disable ACR Public Access"
         if: always()
         run: |
-          echo "🔒 Disabling ACR public access..."
+          echo "🔒 Disabling ACR public access for security..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled false
           echo "✅ ACR public access disabled"
-
-      # ============================================
-      # 🔧 Setup Private DNS (FIX FOR PRIVATE ACR)
-      # ============================================
-      - name: "🔧 Setup Private DNS Records for ACR"
-        run: |
-          echo "🔍 Setting up private DNS for ACR..."
-          
-          # Wait for private endpoint to be ready
-          sleep 30
-          
-          # Get private endpoint IP
-          PE_IP=$(az network private-endpoint show \
-            -g ${RESOURCE_GROUP} \
-            -n "${ACR_NAME}-pe" \
-            --query "customDnsConfigs[0].ipAddresses[0]" -o tsv 2>/dev/null)
-          
-          if [ ! -z "$PE_IP" ] && [ "$PE_IP" != "null" ]; then
-            echo "✅ Private Endpoint IP: $PE_IP"
-            
-            # Create DNS A record
-            echo "📝 Creating DNS A record for private ACR..."
-            az network private-dns record-set a create \
-              -g ${RESOURCE_GROUP} \
-              -z "privatelink.azurecr.io" \
-              -n "${ACR_NAME}" \
-              --no-wait 2>/dev/null || true
-            
-            sleep 10
-            
-            # Add record
-            az network private-dns record-set a add-record \
-              -g ${RESOURCE_GROUP} \
-              -z "privatelink.azurecr.io" \
-              -n "${ACR_NAME}" \
-              -a "$PE_IP" 2>/dev/null || true
-            
-            echo "✅ Private DNS configured: ${ACR_NAME}.privatelink.azurecr.io -> $PE_IP"
-          else
-            echo "⚠️  Could not get private endpoint IP, skipping DNS setup"
-          fi
 
       - name: Configure Web App Managed Identity for ACR
         run: |
@@ -279,20 +238,14 @@ jobs:
           
           echo "✅ Web App Managed Identity configured"
 
-      - name: "📍 Update Web App to Use Private ACR"
+      - name: Update Web App Container Image
         run: |
-          echo "🔄 Updating Web App to use private ACR endpoint..."
-          
-          # Use private ACR FQDN instead of public
-          PRIVATE_ACR_FQDN="${ACR_NAME}.privatelink.azurecr.io"
-          
+          echo "🔄 Updating Web App container image..."
           az webapp config container set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --docker-custom-image-name "${PRIVATE_ACR_FQDN}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" \
-            --docker-registry-server-url "https://${PRIVATE_ACR_FQDN}"
-          
-          echo "✅ Web App configured to use private ACR: $PRIVATE_ACR_FQDN"
+            --docker-custom-image-name "${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" \
+            --docker-registry-server-url "https://${ACR_LOGIN_SERVER}"
 
       - name: Restart Web App
         run: |
@@ -303,8 +256,8 @@ jobs:
 
       - name: Wait for App Startup
         run: |
-          echo "⏳ Waiting 60 seconds for app to start..."
-          sleep 60
+          echo "⏳ Waiting 40 seconds for app to start..."
+          sleep 40
 
       - name: Check Web App Health Status
         run: |
@@ -339,10 +292,8 @@ jobs:
           echo "🎉 DEV Deployment completed successfully!"
           echo "=================================="
           echo "Environment: DEV"
-          echo "ACR: ${ACR_NAME} (PRIVATE)"
-          echo "Private Endpoint: ${ACR_NAME}-pe"
-          echo "Private DNS: ${ACR_NAME}.privatelink.azurecr.io"
-          echo "Image: ${ACR_NAME}.privatelink.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          echo "ACR: ${ACR_NAME} (NOW PRIVATE)"
+          echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
           echo "=================================="
@@ -394,7 +345,7 @@ jobs:
         working-directory: infra
         run: terraform plan
 
-      - name: "✅ Terraform Apply (Create Infrastructure)"
+      - name: Terraform Apply (Create Infrastructure)
         working-directory: infra
         run: terraform apply -auto-approve
 
@@ -411,13 +362,12 @@ jobs:
       # ============================================
       - name: "🔓 Enable ACR Public Access"
         run: |
-          echo "🔓 Enabling ACR public access temporarily..."
+          echo "🔓 Enabling ACR public access for image push..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled true
           echo "✅ ACR public access enabled"
-          sleep 10
 
       - name: Ensure Service Principal has ACR Push Permission
         run: |
@@ -471,53 +421,12 @@ jobs:
       - name: "🔒 Disable ACR Public Access"
         if: always()
         run: |
-          echo "🔒 Disabling ACR public access..."
+          echo "🔒 Disabling ACR public access for security..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled false
           echo "✅ ACR public access disabled"
-
-      # ============================================
-      # 🔧 Setup Private DNS (FIX FOR PRIVATE ACR)
-      # ============================================
-      - name: "🔧 Setup Private DNS Records for ACR"
-        run: |
-          echo "🔍 Setting up private DNS for ACR..."
-          
-          # Wait for private endpoint to be ready
-          sleep 30
-          
-          # Get private endpoint IP
-          PE_IP=$(az network private-endpoint show \
-            -g ${RESOURCE_GROUP} \
-            -n "${ACR_NAME}-pe" \
-            --query "customDnsConfigs[0].ipAddresses[0]" -o tsv 2>/dev/null)
-          
-          if [ ! -z "$PE_IP" ] && [ "$PE_IP" != "null" ]; then
-            echo "✅ Private Endpoint IP: $PE_IP"
-            
-            # Create DNS A record
-            echo "📝 Creating DNS A record for private ACR..."
-            az network private-dns record-set a create \
-              -g ${RESOURCE_GROUP} \
-              -z "privatelink.azurecr.io" \
-              -n "${ACR_NAME}" \
-              --no-wait 2>/dev/null || true
-            
-            sleep 10
-            
-            # Add record
-            az network private-dns record-set a add-record \
-              -g ${RESOURCE_GROUP} \
-              -z "privatelink.azurecr.io" \
-              -n "${ACR_NAME}" \
-              -a "$PE_IP" 2>/dev/null || true
-            
-            echo "✅ Private DNS configured: ${ACR_NAME}.privatelink.azurecr.io -> $PE_IP"
-          else
-            echo "⚠️  Could not get private endpoint IP, skipping DNS setup"
-          fi
 
       - name: Configure Web App Managed Identity for ACR
         run: |
@@ -529,20 +438,14 @@ jobs:
           
           echo "✅ Web App Managed Identity configured"
 
-      - name: "📍 Update Web App to Use Private ACR"
+      - name: Update Web App Container Image
         run: |
-          echo "🔄 Updating Web App to use private ACR endpoint..."
-          
-          # Use private ACR FQDN instead of public
-          PRIVATE_ACR_FQDN="${ACR_NAME}.privatelink.azurecr.io"
-          
+          echo "🔄 Updating Web App container image..."
           az webapp config container set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --docker-custom-image-name "${PRIVATE_ACR_FQDN}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" \
-            --docker-registry-server-url "https://${PRIVATE_ACR_FQDN}"
-          
-          echo "✅ Web App configured to use private ACR: $PRIVATE_ACR_FQDN"
+            --docker-custom-image-name "${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" \
+            --docker-registry-server-url "https://${ACR_LOGIN_SERVER}"
 
       - name: Restart Web App
         run: |
@@ -553,8 +456,8 @@ jobs:
 
       - name: Wait for App Startup
         run: |
-          echo "⏳ Waiting 60 seconds for app to start..."
-          sleep 60
+          echo "⏳ Waiting 40 seconds for app to start..."
+          sleep 40
 
       - name: Check Web App Health Status
         run: |
@@ -589,10 +492,8 @@ jobs:
           echo "🎉 PROD Deployment completed successfully!"
           echo "=================================="
           echo "Environment: PROD"
-          echo "ACR: ${ACR_NAME} (PRIVATE)"
-          echo "Private Endpoint: ${ACR_NAME}-pe"
-          echo "Private DNS: ${ACR_NAME}.privatelink.azurecr.io"
-          echo "Image: ${ACR_NAME}.privatelink.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          echo "ACR: ${ACR_NAME} (NOW PRIVATE)"
+          echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
           echo "=================================="
