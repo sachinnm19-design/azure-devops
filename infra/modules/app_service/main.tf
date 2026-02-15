@@ -15,6 +15,9 @@ resource "azurerm_linux_web_app" "webapp" {
   service_plan_id     = azurerm_service_plan.asp.id
   https_only          = true
 
+  # ✅ VNET Integration for private ACR access
+  virtual_network_subnet_id = var.app_service_subnet_id
+
   # ✅ System-Assigned Managed Identity (for ACR access)
   identity {
     type = "SystemAssigned"
