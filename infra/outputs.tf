@@ -48,7 +48,6 @@ output "webapp_url" {
   value       = "https://${module.app_service.webapp_default_hostname}"
 }
 
-# ✅ FIXED: Removed duplicate description - only one description per output!
 output "webapp_principal_id" {
   description = "Web App managed identity principal ID - use this ID to grant permissions to resources via RBAC"
   value       = module.app_service.webapp_principal_id
@@ -84,4 +83,24 @@ output "app_insights_connection_string" {
   description = "Application Insights connection string"
   value       = azurerm_application_insights.app_insights.connection_string
   sensitive   = true
+}
+
+output "vnet_id" {
+  description = "VNet resource ID"
+  value       = module.networking.vnet_id
+}
+
+output "app_service_subnet_id" {
+  description = "App Service subnet ID"
+  value       = module.networking.app_service_subnet_id
+}
+
+output "private_endpoint_id" {
+  description = "Private Endpoint ID"
+  value       = module.private_endpoint.private_endpoint_id
+}
+
+output "acr_private_dns_zone_id" {
+  description = "ACR Private DNS Zone ID"
+  value       = module.networking.acr_private_dns_zone_id
 }
