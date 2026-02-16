@@ -42,6 +42,7 @@ resource "azurerm_linux_web_app" "webapp" {
 
   site_config {
     vnet_route_all_enabled = true
+    container_registry_use_managed_identity = true
     # ✅ Docker configuration via application_stack
     application_stack {
       docker_image_name   = "${var.image_name}:${var.image_tag}"
