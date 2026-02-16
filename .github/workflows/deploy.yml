@@ -162,14 +162,37 @@ jobs:
       # ============================================
       # 🔓 ENABLE ACR PUBLIC ACCESS (For Image Push)
       # ============================================
-      - name: "🔓 Enable ACR Public Access"
+      - name: "🔓 Enable ACR Public Access and Verify"
         run: |
-          echo "🔓 Enabling ACR public access temporarily..."
+          echo "🔓 Enabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled true
-          echo "✅ ACR public access enabled"
+          
+          echo "⏳ Waiting for ACR to be publicly accessible..."
+          
+          # Verify ACR is actually public
+          for i in {1..10}; do
+            PUBLIC_ACCESS=$(az acr show \
+              --name ${ACR_NAME} \
+              --resource-group ${RESOURCE_GROUP} \
+              --query "publicNetworkAccessEnabled" -o tsv)
+            
+            if [ "$PUBLIC_ACCESS" == "true" ]; then
+              echo "✅ ACR public access confirmed (attempt $i)"
+              break
+            else
+              if [ $i -eq 10 ]; then
+                echo "❌ ACR still not public after 10 checks"
+                exit 1
+              fi
+              echo "  Waiting... (attempt $i/10)"
+              sleep 10
+            fi
+          done
+          
+          echo "✅ ACR public access enabled and verified"
           sleep 15
 
       - name: Ensure Service Principal has ACR Push Permission
@@ -191,18 +214,30 @@ jobs:
           
           echo "✅ Service Principal has AcrPush role"
 
-      - name: Login to ACR
+      - name: Login to ACR with Retry
         run: |
           echo "🔐 Logging into ACR..."
           
           CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
           CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
-          echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-            --username "$CLIENT_ID" \
-            --password-stdin
-          
-          echo "✅ Successfully logged into ACR"
+          # Retry logic for login
+          for i in {1..5}; do
+            echo "  Login attempt $i/5..."
+            if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
+              --username "$CLIENT_ID" \
+              --password-stdin; then
+              echo "✅ Successfully logged into ACR"
+              break
+            else
+              if [ $i -eq 5 ]; then
+                echo "❌ Failed to login after 5 attempts"
+                exit 1
+              fi
+              echo "  Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
 
       - name: Tag and Push Image to ACR
         run: |
@@ -444,14 +479,37 @@ jobs:
       # ============================================
       # 🔓 ENABLE ACR PUBLIC ACCESS (For Image Push)
       # ============================================
-      - name: "🔓 Enable ACR Public Access"
+      - name: "🔓 Enable ACR Public Access and Verify"
         run: |
-          echo "🔓 Enabling ACR public access temporarily..."
+          echo "🔓 Enabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled true
-          echo "✅ ACR public access enabled"
+          
+          echo "⏳ Waiting for ACR to be publicly accessible..."
+          
+          # Verify ACR is actually public
+          for i in {1..10}; do
+            PUBLIC_ACCESS=$(az acr show \
+              --name ${ACR_NAME} \
+              --resource-group ${RESOURCE_GROUP} \
+              --query "publicNetworkAccessEnabled" -o tsv)
+            
+            if [ "$PUBLIC_ACCESS" == "true" ]; then
+              echo "✅ ACR public access confirmed (attempt $i)"
+              break
+            else
+              if [ $i -eq 10 ]; then
+                echo "❌ ACR still not public after 10 checks"
+                exit 1
+              fi
+              echo "  Waiting... (attempt $i/10)"
+              sleep 10
+            fi
+          done
+          
+          echo "✅ ACR public access enabled and verified"
           sleep 15
 
       - name: Ensure Service Principal has ACR Push Permission
@@ -473,18 +531,30 @@ jobs:
           
           echo "✅ Service Principal has AcrPush role"
 
-      - name: Login to ACR
+      - name: Login to ACR with Retry
         run: |
           echo "🔐 Logging into ACR..."
           
           CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
           CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
-          echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-            --username "$CLIENT_ID" \
-            --password-stdin
-          
-          echo "✅ Successfully logged into ACR"
+          # Retry logic for login
+          for i in {1..5}; do
+            echo "  Login attempt $i/5..."
+            if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
+              --username "$CLIENT_ID" \
+              --password-stdin; then
+              echo "✅ Successfully logged into ACR"
+              break
+            else
+              if [ $i -eq 5 ]; then
+                echo "❌ Failed to login after 5 attempts"
+                exit 1
+              fi
+              echo "  Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
 
       - name: Tag and Push Image to ACR
         run: |
