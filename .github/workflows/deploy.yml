@@ -162,6 +162,7 @@ jobs:
       # ============================================
       # 🔓 ENABLE ACR PUBLIC ACCESS (For Image Push)
       # ============================================
+	  
       - name: "🔓 Enable ACR Public Access and Verify"
         run: |
           echo "🔓 Enabling ACR public access..."
@@ -177,17 +178,18 @@ jobs:
             PUBLIC_ACCESS=$(az acr show \
               --name ${ACR_NAME} \
               --resource-group ${RESOURCE_GROUP} \
-              --query "publicNetworkAccessEnabled" -o tsv)
+              --query "publicNetworkAccess" -o tsv)
             
-            if [ "$PUBLIC_ACCESS" == "true" ]; then
+            if [ "$PUBLIC_ACCESS" == "Enabled" ]; then
               echo "✅ ACR public access confirmed (attempt $i)"
               break
             else
               if [ $i -eq 10 ]; then
                 echo "❌ ACR still not public after 10 checks"
+                echo "   Current status: $PUBLIC_ACCESS"
                 exit 1
               fi
-              echo "  Waiting... (attempt $i/10)"
+              echo "  Waiting... (attempt $i/10) - Current: $PUBLIC_ACCESS"
               sleep 10
             fi
           done
