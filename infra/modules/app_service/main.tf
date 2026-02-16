@@ -98,6 +98,8 @@ resource "azurerm_linux_web_app" "webapp" {
       # Application settings
       "ENVIRONMENT"                               = var.environment
       "APP_VERSION"                               = var.image_tag
+      "WEBSITE_VNET_ROUTE_ALL"                    = "1"
+      "WEBSITE_PULL_IMAGE_OVER_VNET"              = "1"
     },
     var.additional_app_settings
   )
