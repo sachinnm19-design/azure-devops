@@ -1,6 +1,6 @@
 # 🚀 Azure DevOps Demo - Complete CI/CD Pipeline
 
-A production-ready DevOps demonstration project showcasing Infrastructure as Code (IaC), CI/CD automation, security best practices, and comprehensive monitoring on Azure.
+A production-ready DevOps demonstration project showcasing Infrastructure as Code (IaC), CI/CD automation, security best practices, and comprehensive monitoring on Azure
 
 [![CI/CD Pipeline](https://github.com/sachinnm19-design/azure-devops/actions/workflows/deploy.yml/badge.svg)](https://github.com/sachinnm19-design/azure-devops/actions/workflows/deploy.yml)
 
