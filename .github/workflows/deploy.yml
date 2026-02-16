@@ -8,7 +8,6 @@ on:
 
 env:
   IMAGE_NAME: demo-app
-  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
 # =====================================================
@@ -28,18 +27,18 @@ jobs:
       - name: Build Docker Image
         run: |
           docker build \
-            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            -t ${{ env.IMAGE_NAME }}:latest \
             ./app
 
       - name: Test Container Locally
         run: |
-          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:latest
           sleep 10
           curl -f http://localhost:3000/health || exit 1
           docker stop test-app
 
       - name: Save Docker Image
-        run: docker save ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o app-image.tar
+        run: docker save ${{ env.IMAGE_NAME }}:latest -o app-image.tar
 
       - name: Upload Docker Image Artifact
         uses: actions/upload-artifact@v4
@@ -76,7 +75,7 @@ jobs:
       - name: Run Trivy Security Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          image-ref: ${{ env.IMAGE_NAME }}:latest
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -185,15 +184,14 @@ jobs:
             else
               if [ $i -eq 10 ]; then
                 echo "❌ ACR still not public after 10 checks"
-                echo "   Current status: $PUBLIC_ACCESS"
                 exit 1
               fi
-              echo "  Waiting... (attempt $i/10) - Current: $PUBLIC_ACCESS"
+              echo "  Waiting... (attempt $i/10)"
               sleep 10
             fi
           done
           
-          echo "✅ ACR public access enabled and verified"
+          echo "✅ ACR public access enabled"
           sleep 15
 
       # ✅ NEW STEP: Allow GitHub Actions IP to access ACR
@@ -227,67 +225,64 @@ jobs:
           
           sleep 10
 
-      - name: Ensure Service Principal has ACR Push Permission
+      - name: "🔐 Enable ACR Admin and Get Credentials"
         run: |
-          echo "🔐 Ensuring Service Principal has AcrPush role..."
-          
-          ACR_ID=$(az acr show \
+          echo "🔐 Enabling ACR admin user..."
+          az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --query id -o tsv)
+            --admin-enabled true
           
-          SP_OBJECT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
+          echo "📝 Getting ACR admin credentials..."
+          ACR_USERNAME=$(az acr credential show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query "username" -o tsv)
           
-          az role assignment create \
-            --assignee-object-id "$SP_OBJECT_ID" \
-            --role "AcrPush" \
-            --scope "$ACR_ID" \
-            --allow-no-subscriptions 2>/dev/null || echo "✓ Role already assigned"
+          ACR_PASSWORD=$(az acr credential show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query "passwords[0].value" -o tsv)
           
-          echo "✅ Service Principal has AcrPush role"
+          # Store in GitHub environment for next steps
+          echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
+          echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
+          
+          echo "✅ ACR admin enabled"
 
-      - name: Login to ACR with Retry
+      - name: "🔐 Login to ACR"
         run: |
           echo "🔐 Logging into ACR..."
-          
-          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
           # Retry logic for login
           for i in {1..5}; do
             echo "  Login attempt $i/5..."
-            if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-              --username "$CLIENT_ID" \
+            if echo "${{ env.ACR_PASSWORD }}" | docker login ${ACR_LOGIN_SERVER} \
+              --username "${{ env.ACR_USERNAME }}" \
               --password-stdin; then
               echo "✅ Successfully logged into ACR"
               break
             else
               if [ $i -eq 5 ]; then
-                echo "❌ Failed to login after 5 attempts"
+                echo "❌ Failed to login"
                 exit 1
               fi
-              echo "  Retrying in 15 seconds..."
               sleep 15
             fi
           done
 
-      - name: Tag and Push Image to ACR
+      - name: "📤 Tag and Push Image to ACR"
         run: |
-          echo "🏷️  Tagging Docker images..."
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+          echo "🏷️  Tagging Docker image..."
+          docker tag ${{ env.IMAGE_NAME }}:latest \
             ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
-          echo "📤 Pushing images to ACR (this may take a few minutes)..."
+          echo "📤 Pushing image to ACR..."
           # Add retry logic for push
           for i in {1..3}; do
             echo "  Attempt $i..."
-            if docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} && \
-               docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest; then
-              echo "✅ Images pushed successfully"
-              echo "   - SHA tag: ${{ env.IMAGE_TAG }}"
-              echo "   - Latest tag: latest"
+            if docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest; then
+              echo "✅ Image pushed successfully"
               break
             else
               if [ $i -eq 3 ]; then
@@ -298,11 +293,7 @@ jobs:
               sleep 30
             fi
           done
-
-      # ✅ IMPORTANT: Keep ACR public for a bit longer after push
-      - name: "⏳ Waiting for push to complete..."
-        run: |
-          echo "Waiting 30 seconds for push operations to finalize..."
+          
           sleep 30
 
       # ============================================
@@ -370,85 +361,71 @@ jobs:
             echo "⚠️  Could not get network interface ID"
           fi
 
-      - name: Configure Web App for ACR Authentication
+      - name: "🔐 Configure App Service Managed Identity for ACR"
         run: |
-          echo "🔧 Configuring Web App ACR credentials..."
+          echo "🔧 Configuring Managed Identity for ACR pull..."
           
-          # Enable ACR admin user
-          az acr update \
+          # Get App Service Managed Identity Principal ID
+          PRINCIPAL_ID=$(az webapp identity show \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "principalId" -o tsv)
+          
+          echo "✅ Managed Identity Principal ID: $PRINCIPAL_ID"
+          
+          # Get ACR Resource ID
+          ACR_ID=$(az acr show \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --admin-enabled true
+            --query "id" -o tsv)
           
-          # Get ACR admin credentials
-          ACR_USERNAME=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "username" -o tsv)
+          # Assign AcrPull role to Managed Identity
+          az role assignment create \
+            --assignee-object-id "$PRINCIPAL_ID" \
+            --role "AcrPull" \
+            --scope "$ACR_ID" 2>/dev/null || echo "✓ Role already assigned"
           
-          ACR_PASSWORD=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "passwords[0].value" -o tsv)
+          echo "✅ Managed Identity has AcrPull role on ACR"
           
-          echo "✅ Got ACR credentials"
-          
-          # Configure Managed Identity
-          echo "🔧 Configuring Web App to use Managed Identity..."
+          # Enable Managed Identity credentials for ACR
           az webapp config set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --generic-configurations '{"acrUseManagedIdentityCreds": false}'
+            --generic-configurations '{"acrUseManagedIdentityCreds": true}'
           
-          echo "✅ Web App Managed Identity configured"
+          echo "✅ Web App Managed Identity for ACR enabled"
 
-      - name: "📍 Update Web App to Use Private ACR"
+      - name: "📍 Update Web App to Use ACR"
         run: |
-          echo "🔄 Updating Web App to use private ACR endpoint..."
+          echo "🔄 Updating Web App to pull from ACR using Managed Identity..."
           
-          # Use private ACR FQDN
-          PRIVATE_ACR_FQDN="${ACR_NAME}.privatelink.azurecr.io"
+          # Use the public FQDN but App Service will use Managed Identity auth
+          PUBLIC_ACR_FQDN="${ACR_NAME}.azurecr.io"
           
-          # Get ACR admin credentials
-          ACR_USERNAME=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "username" -o tsv)
+          echo "📝 Configuring Web App to pull: ${PUBLIC_ACR_FQDN}/demo-app:latest"
+          echo "📝 Authentication: Managed Identity (AcrPull role)"
           
-          ACR_PASSWORD=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "passwords[0].value" -o tsv)
-          
-          # Update Web App with container config and credentials using SHA tag
           az webapp config container set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --docker-custom-image-name "${PRIVATE_ACR_FQDN}/demo-app:${{ env.IMAGE_TAG }}" \
-            --docker-registry-server-url "https://${PRIVATE_ACR_FQDN}" \
-            --docker-registry-server-user "$ACR_USERNAME" \
-            --docker-registry-server-password "$ACR_PASSWORD"
+            --docker-custom-image-name "${PUBLIC_ACR_FQDN}/${{ env.IMAGE_NAME }}:latest"
           
-          echo "✅ Web App configured with ACR credentials"
-          echo "   Image: ${PRIVATE_ACR_FQDN}/demo-app:${{ env.IMAGE_TAG }}"
-          echo "   Registry: ${PRIVATE_ACR_FQDN}"
+          echo "✅ Web App configured to use ACR with Managed Identity"
 
-      - name: Restart Web App
+      - name: "♻️ Restart Web App"
         run: |
           echo "♻️  Restarting Web App..."
           az webapp restart \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP"
 
-      - name: Wait for App Startup
+      - name: "⏳ Wait for App Startup"
         run: |
-          echo "⏳ Waiting 60 seconds for app to start..."
-          sleep 60
+          echo "⏳ Waiting 90 seconds for app to start..."
+          sleep 90
 
-      - name: Check Web App Health Status
+      - name: "🏥 Check Web App Health"
         run: |
-          echo "🏥 Checking Web App health status..."
-          
           STATUS=$(az webapp show \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
@@ -457,31 +434,22 @@ jobs:
           echo "Web App Status: $STATUS"
           
           if [ "$STATUS" = "Running" ]; then
-            echo "✅ Web App is running"
+            echo "✅ Web App is RUNNING"
           else
             echo "⚠️  Web App status: $STATUS"
           fi
 
-      - name: View Application Logs
-        if: always()
-        continue-on-error: true
-        run: |
-          echo "📋 Fetching application logs..."
-          az webapp log download \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --log-file app-logs.zip 2>/dev/null || echo "⚠️  Could not fetch logs"
-
-      - name: Deployment Summary
+      - name: "🎉 Deployment Summary"
         if: success()
         run: |
+          echo ""
           echo "🎉 DEV Deployment completed successfully!"
           echo "=================================="
           echo "Environment: DEV"
-          echo "ACR: ${ACR_NAME} (PRIVATE)"
-          echo "Private Endpoint: ${ACR_NAME}-pe"
-          echo "Private DNS: ${ACR_NAME}.privatelink.azurecr.io"
-          echo "Image: ${ACR_NAME}.privatelink.azurecr.io/demo-app:${{ env.IMAGE_TAG }}"
+          echo "ACR: ${ACR_NAME} (PRIVATE ✅)"
+          echo "ACR Public Access: DISABLED ✅"
+          echo "Image: demo-app:latest"
+          echo "Authentication: Managed Identity (AcrPull) ✅"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
           echo "=================================="
@@ -536,7 +504,7 @@ jobs:
         working-directory: infra
         run: terraform plan
 
-      - name: "✅ Terraform Apply (Create Infrastructure)"
+      - name: "✅ Terraform Apply"
         working-directory: infra
         run: terraform apply -auto-approve
 
@@ -548,20 +516,13 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      # ============================================
-      # 🔓 ENABLE ACR PUBLIC ACCESS (For Image Push)
-      # ============================================
-      - name: "🔓 Enable ACR Public Access and Verify"
+      - name: "🔓 Enable ACR Public Access (Temporarily)"
         run: |
-          echo "🔓 Enabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled true
           
-          echo "⏳ Waiting for ACR to be publicly accessible..."
-          
-          # Verify ACR is actually public
           for i in {1..10}; do
             PUBLIC_ACCESS=$(az acr show \
               --name ${ACR_NAME} \
@@ -569,154 +530,90 @@ jobs:
               --query "publicNetworkAccess" -o tsv)
             
             if [ "$PUBLIC_ACCESS" == "Enabled" ]; then
-              echo "✅ ACR public access confirmed (attempt $i)"
               break
             else
               if [ $i -eq 10 ]; then
-                echo "❌ ACR still not public after 10 checks"
-                echo "   Current status: $PUBLIC_ACCESS"
                 exit 1
               fi
-              echo "  Waiting... (attempt $i/10) - Current: $PUBLIC_ACCESS"
               sleep 10
             fi
           done
-          
-          echo "✅ ACR public access enabled and verified"
-          sleep 15
 
-      # ✅ NEW STEP: Allow GitHub Actions IP to access ACR
       - name: "🔓 Add GitHub Actions IP to ACR Firewall"
         run: |
-          echo "🔓 Getting GitHub Actions runner IP..."
-          
-          # Get the runner's public IP
           RUNNER_IP=$(curl -s https://api.ipify.org)
-          echo "✅ GitHub Actions runner IP: $RUNNER_IP"
-          
-          echo "📝 Adding IP to ACR firewall rules..."
-          
-          # Add the IP to ACR's network rules (with retries)
-          for j in {1..3}; do
-            if az acr network-rule add \
-              --name ${ACR_NAME} \
-              --resource-group ${RESOURCE_GROUP} \
-              --ip-address $RUNNER_IP/32 2>/dev/null; then
-              echo "✅ IP added to ACR firewall"
-              break
-            else
-              if [ $j -eq 3 ]; then
-                echo "⚠️  Could not add IP to firewall (may already exist)"
-              else
-                echo "  Retrying..."
-                sleep 5
-              fi
-            fi
-          done
-          
-          sleep 10
-
-      - name: Ensure Service Principal has ACR Push Permission
-        run: |
-          echo "🔐 Ensuring Service Principal has AcrPush role..."
-          
-          ACR_ID=$(az acr show \
+          az acr network-rule add \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --query id -o tsv)
-          
-          SP_OBJECT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          
-          az role assignment create \
-            --assignee-object-id "$SP_OBJECT_ID" \
-            --role "AcrPush" \
-            --scope "$ACR_ID" \
-            --allow-no-subscriptions 2>/dev/null || echo "✓ Role already assigned"
-          
-          echo "✅ Service Principal has AcrPush role"
+            --ip-address $RUNNER_IP/32 2>/dev/null || true
+          sleep 10
 
-      - name: Login to ACR with Retry
+      - name: "🔐 Enable ACR Admin and Get Credentials"
         run: |
-          echo "🔐 Logging into ACR..."
+          az acr update \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --admin-enabled true
           
-          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
+          ACR_USERNAME=$(az acr credential show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query "username" -o tsv)
           
-          # Retry logic for login
+          ACR_PASSWORD=$(az acr credential show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query "passwords[0].value" -o tsv)
+          
+          echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
+          echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
+
+      - name: "🔐 Login to ACR"
+        run: |
           for i in {1..5}; do
-            echo "  Login attempt $i/5..."
-            if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-              --username "$CLIENT_ID" \
+            if echo "${{ env.ACR_PASSWORD }}" | docker login ${ACR_LOGIN_SERVER} \
+              --username "${{ env.ACR_USERNAME }}" \
               --password-stdin; then
-              echo "✅ Successfully logged into ACR"
               break
             else
               if [ $i -eq 5 ]; then
-                echo "❌ Failed to login after 5 attempts"
                 exit 1
               fi
-              echo "  Retrying in 15 seconds..."
               sleep 15
             fi
           done
 
-      - name: Tag and Push Image to ACR
+      - name: "📤 Tag and Push Image to ACR"
         run: |
-          echo "🏷️  Tagging Docker images..."
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+          docker tag ${{ env.IMAGE_NAME }}:latest \
             ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
-          echo "📤 Pushing images to PROD ACR (this may take a few minutes)..."
-          # Add retry logic for push
           for i in {1..3}; do
-            echo "  Attempt $i..."
-            if docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} && \
-               docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest; then
-              echo "✅ Images pushed successfully"
-              echo "   - SHA tag: ${{ env.IMAGE_TAG }}"
-              echo "   - Latest tag: latest"
+            if docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest; then
               break
             else
               if [ $i -eq 3 ]; then
-                echo "❌ Failed after 3 attempts"
                 exit 1
               fi
-              echo "  Retrying in 30 seconds..."
               sleep 30
             fi
           done
-
-      # ✅ IMPORTANT: Keep ACR public for a bit longer after push
-      - name: "⏳ Waiting for push to complete..."
-        run: |
-          echo "Waiting 30 seconds for push operations to finalize..."
+          
           sleep 30
 
-      # ============================================
-      # 🔒 DISABLE ACR PUBLIC ACCESS (Security)
-      # ============================================
       - name: "🔒 Disable ACR Public Access"
         run: |
-          echo "🔒 Disabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --public-network-enabled false
-          echo "✅ ACR public access disabled"
 
-      # ============================================
-      # 🔧 Setup Private DNS (FIX FOR PRIVATE ACR)
-      # ============================================
       - name: "🔧 Setup Private DNS Records for ACR"
         run: |
           echo "🔍 Setting up private DNS for ACR..."
           
-          # Wait for private endpoint to be ready
           sleep 30
           
-          # Get private endpoint IP from network interface
           NIC_ID=$(az network private-endpoint show \
             -g ${RESOURCE_GROUP} \
             -n "${ACR_NAME}-pe" \
@@ -730,7 +627,6 @@ jobs:
             if [ ! -z "$PRIVATE_IP" ] && [ "$PRIVATE_IP" != "null" ]; then
               echo "✅ Private Endpoint IP: $PRIVATE_IP"
               
-              # Delete existing record
               az network private-dns record-set a delete \
                 -g ${RESOURCE_GROUP} \
                 -z "privatelink.azurecr.io" \
@@ -739,7 +635,6 @@ jobs:
               
               sleep 5
               
-              # Create new record
               az network private-dns record-set a create \
                 -g ${RESOURCE_GROUP} \
                 -z "privatelink.azurecr.io" \
@@ -751,126 +646,72 @@ jobs:
                 -n "${ACR_NAME}" \
                 -a "$PRIVATE_IP" 2>/dev/null || true
               
-              echo "✅ Private DNS configured: ${ACR_NAME}.privatelink.azurecr.io -> $PRIVATE_IP"
-            else
-              echo "⚠️  Could not get private IP from NIC"
+              echo "✅ Private DNS configured"
             fi
-          else
-            echo "⚠️  Could not get network interface ID"
           fi
 
-      - name: Configure Web App for ACR Authentication
+      - name: "🔐 Configure App Service Managed Identity for ACR"
         run: |
-          echo "🔧 Configuring Web App ACR credentials..."
+          PRINCIPAL_ID=$(az webapp identity show \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "principalId" -o tsv)
           
-          # Enable ACR admin user
-          az acr update \
+          ACR_ID=$(az acr show \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --admin-enabled true
+            --query "id" -o tsv)
           
-          # Get ACR admin credentials
-          ACR_USERNAME=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "username" -o tsv)
+          az role assignment create \
+            --assignee-object-id "$PRINCIPAL_ID" \
+            --role "AcrPull" \
+            --scope "$ACR_ID" 2>/dev/null || true
           
-          ACR_PASSWORD=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "passwords[0].value" -o tsv)
-          
-          echo "✅ Got ACR credentials"
-          
-          # Configure Managed Identity
-          echo "🔧 Configuring Web App to use Managed Identity..."
           az webapp config set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --generic-configurations '{"acrUseManagedIdentityCreds": false}'
-          
-          echo "✅ Web App Managed Identity configured"
+            --generic-configurations '{"acrUseManagedIdentityCreds": true}'
 
-      - name: "📍 Update Web App to Use Private ACR"
+      - name: "📍 Update Web App to Use ACR"
         run: |
-          echo "🔄 Updating Web App to use private ACR endpoint..."
+          PUBLIC_ACR_FQDN="${ACR_NAME}.azurecr.io"
           
-          # Use private ACR FQDN
-          PRIVATE_ACR_FQDN="${ACR_NAME}.privatelink.azurecr.io"
-          
-          # Get ACR admin credentials
-          ACR_USERNAME=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "username" -o tsv)
-          
-          ACR_PASSWORD=$(az acr credential show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query "passwords[0].value" -o tsv)
-          
-          # Update Web App with container config and credentials using SHA tag
           az webapp config container set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --docker-custom-image-name "${PRIVATE_ACR_FQDN}/demo-app:${{ env.IMAGE_TAG }}" \
-            --docker-registry-server-url "https://${PRIVATE_ACR_FQDN}" \
-            --docker-registry-server-user "$ACR_USERNAME" \
-            --docker-registry-server-password "$ACR_PASSWORD"
-          
-          echo "✅ Web App configured with ACR credentials"
-          echo "   Image: ${PRIVATE_ACR_FQDN}/demo-app:${{ env.IMAGE_TAG }}"
-          echo "   Registry: ${PRIVATE_ACR_FQDN}"
+            --docker-custom-image-name "${PUBLIC_ACR_FQDN}/${{ env.IMAGE_NAME }}:latest"
 
-      - name: Restart Web App
+      - name: "♻️ Restart Web App"
         run: |
-          echo "♻️  Restarting Web App..."
           az webapp restart \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP"
 
-      - name: Wait for App Startup
-        run: |
-          echo "⏳ Waiting 60 seconds for app to start..."
-          sleep 60
+      - name: "⏳ Wait for App Startup"
+        run: sleep 90
 
-      - name: Check Web App Health Status
+      - name: "🏥 Check Web App Health"
         run: |
-          echo "🏥 Checking Web App health status..."
-          
           STATUS=$(az webapp show \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
             --query state -o tsv)
           
-          echo "Web App Status: $STATUS"
-          
           if [ "$STATUS" = "Running" ]; then
-            echo "✅ Web App is running"
-          else
-            echo "⚠️  Web App status: $STATUS"
+            echo "✅ Web App is RUNNING"
           fi
 
-      - name: View Application Logs
-        if: always()
-        continue-on-error: true
-        run: |
-          echo "📋 Fetching application logs..."
-          az webapp log download \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --log-file app-logs.zip 2>/dev/null || echo "⚠️  Could not fetch logs"
-
-      - name: Deployment Summary
+      - name: "🎉 Deployment Summary"
         if: success()
         run: |
+          echo ""
           echo "🎉 PROD Deployment completed successfully!"
           echo "=================================="
           echo "Environment: PROD"
-          echo "ACR: ${ACR_NAME} (PRIVATE)"
-          echo "Private Endpoint: ${ACR_NAME}-pe"
-          echo "Private DNS: ${ACR_NAME}.privatelink.azurecr.io"
-          echo "Image: ${ACR_NAME}.privatelink.azurecr.io/demo-app:${{ env.IMAGE_TAG }}"
+          echo "ACR: ${ACR_NAME} (PRIVATE ✅)"
+          echo "ACR Public Access: DISABLED ✅"
+          echo "Image: demo-app:latest"
+          echo "Authentication: Managed Identity (AcrPull) ✅"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
           echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
           echo "=================================="
