@@ -167,7 +167,7 @@ jobs:
             --public-network-enabled true \
             --default-action Allow
           
-          sleep 10
+          sleep 30
 
       - name: "🔐 Login to ACR"
         run: |
