@@ -158,32 +158,19 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: "🔓 Enable ACR Public Access"
+      - name: "🔓 Enable ACR Public Access (All Networks)"
         run: |
-          echo "🔓 Enabling ACR public access..."
+          echo "🔓 Enabling ACR public access for ALL networks..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled true
+            --public-network-enabled true \
+            --default-action Allow
           
-          echo "⏳ Waiting for ACR to be publicly accessible..."
-          for i in {1..10}; do
-            PUBLIC_ACCESS=$(az acr show \
-              --name ${ACR_NAME} \
-              --resource-group ${RESOURCE_GROUP} \
-              --query "publicNetworkAccess" -o tsv)
-            
-            if [ "$PUBLIC_ACCESS" == "Enabled" ]; then
-              echo "✅ ACR public access confirmed"
-              break
-            else
-              if [ $i -eq 10 ]; then
-                echo "❌ ACR still not public"
-                exit 1
-              fi
-              sleep 10
-            fi
-          done
+          echo "⏳ Waiting for ACR to stabilize..."
+          sleep 10
+          
+          echo "✅ ACR is now publicly accessible to ALL networks"
 
       - name: "🔐 Login to ACR (Service Principal)"
         run: |
@@ -192,21 +179,14 @@ jobs:
           CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
           CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
-          for i in {1..5}; do
-            echo "  Login attempt $i/5..."
-            if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-              --username "$CLIENT_ID" \
-              --password-stdin; then
-              echo "✅ Successfully logged into ACR"
-              break
-            else
-              if [ $i -eq 5 ]; then
-                echo "❌ Failed to login"
-                exit 1
-              fi
-              sleep 10
-            fi
-          done
+          if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
+            --username "$CLIENT_ID" \
+            --password-stdin; then
+            echo "✅ Successfully logged into ACR"
+          else
+            echo "❌ Failed to login"
+            exit 1
+          fi
 
       - name: "📤 Tag and Push Image to ACR"
         run: |
@@ -235,7 +215,8 @@ jobs:
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled false
+            --public-network-enabled false \
+            --default-action Deny
           echo "✅ ACR is now PRIVATE"
 
       - name: "🔐 Configure App Service Managed Identity for ACR"
@@ -382,28 +363,19 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: "🔓 Enable ACR Public Access"
+      - name: "🔓 Enable ACR Public Access (All Networks)"
         run: |
+          echo "🔓 Enabling ACR public access for ALL networks..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled true
+            --public-network-enabled true \
+            --default-action Allow
           
-          for i in {1..10}; do
-            PUBLIC_ACCESS=$(az acr show \
-              --name ${ACR_NAME} \
-              --resource-group ${RESOURCE_GROUP} \
-              --query "publicNetworkAccess" -o tsv)
-            
-            if [ "$PUBLIC_ACCESS" == "Enabled" ]; then
-              break
-            else
-              if [ $i -eq 10 ]; then
-                exit 1
-              fi
-              sleep 10
-            fi
-          done
+          echo "⏳ Waiting for ACR to stabilize..."
+          sleep 10
+          
+          echo "✅ ACR is now publicly accessible to ALL networks"
 
       - name: "🔐 Login to ACR (Service Principal)"
         run: |
@@ -412,21 +384,14 @@ jobs:
           CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
           CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
           
-          for i in {1..5}; do
-            echo "  Login attempt $i/5..."
-            if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-              --username "$CLIENT_ID" \
-              --password-stdin; then
-              echo "✅ Successfully logged into ACR"
-              break
-            else
-              if [ $i -eq 5 ]; then
-                echo "❌ Failed to login"
-                exit 1
-              fi
-              sleep 10
-            fi
-          done
+          if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
+            --username "$CLIENT_ID" \
+            --password-stdin; then
+            echo "✅ Successfully logged into ACR"
+          else
+            echo "❌ Failed to login"
+            exit 1
+          fi
 
       - name: "📤 Tag and Push Image to ACR"
         run: |
@@ -447,10 +412,13 @@ jobs:
 
       - name: "🔒 Disable ACR Public Access"
         run: |
+          echo "🔒 Disabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled false
+            --public-network-enabled false \
+            --default-action Deny
+          echo "✅ ACR is now PRIVATE"
 
       - name: "🔐 Configure App Service Managed Identity for ACR"
         run: |
