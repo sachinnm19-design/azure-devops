@@ -139,12 +139,9 @@ jobs:
           }
           EOF
 
-      - name: "✅ Terraform Init (Select DEV Workspace)"
+      - name: "✅ Terraform Init"
         working-directory: infra
-        run: |
-          terraform init -upgrade
-          terraform workspace select dev || terraform workspace new dev
-          echo "✅ Using workspace: dev"
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         working-directory: infra
@@ -424,12 +421,9 @@ jobs:
           }
           EOF
 
-      - name: "✅ Terraform Init (Select PROD Workspace)"
+      - name: "✅ Terraform Init"
         working-directory: infra
-        run: |
-          terraform init -upgrade
-          terraform workspace select prod || terraform workspace new prod
-          echo "✅ Using workspace: prod"
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         working-directory: infra
