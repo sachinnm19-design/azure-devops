@@ -411,7 +411,7 @@ jobs:
             --docker-custom-image-name "${PUBLIC_ACR_FQDN}/${{ env.IMAGE_NAME }}:latest"
           
           echo "✅ Web App configured to use ACR with Managed Identity"
-		  sleep 120
+          sleep 120
 
       - name: "♻️ Restart Web App"
         run: |
