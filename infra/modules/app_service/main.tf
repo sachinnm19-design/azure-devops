@@ -41,6 +41,7 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   site_config {
+    vnet_route_all_enabled = true
     # ✅ Docker configuration via application_stack
     application_stack {
       docker_image_name   = "${var.image_name}:${var.image_tag}"
@@ -98,7 +99,6 @@ resource "azurerm_linux_web_app" "webapp" {
       # Application settings
       "ENVIRONMENT"                               = var.environment
       "APP_VERSION"                               = var.image_tag
-      "WEBSITE_VNET_ROUTE_ALL"                    = "1"
       "WEBSITE_PULL_IMAGE_OVER_VNET"              = "1"
     },
     var.additional_app_settings
