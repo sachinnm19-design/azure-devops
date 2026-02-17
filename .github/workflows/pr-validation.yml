@@ -1,37 +1,24 @@
-name: PR Checks & Security Scanning
+name: PR Checks & Validation
 
 on:
   pull_request:
     branches:
       - main
 
+env:
+  IMAGE_NAME: demo-app
+  IMAGE_TAG: latest
+
 jobs:
-  validate:
+# =====================================================
+# STAGE 1: BUILD & TEST
+# =====================================================
+  build:
+    name: Build & Test
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Terraform Validate
-        working-directory: infra
-        run: terraform init -upgrade
-
-      - name: Checkov Security Scan
-        run: |
-          pip install checkov
-          checkov -d infra/ --quiet --compact
-
-  build-and-scan:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -40,32 +27,113 @@ jobs:
       - name: Build Docker Image
         run: |
           docker build \
-            -t demo-app:latest \
+            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             ./app
 
-      - name: Local Container Test
+      - name: Test Container Locally
         run: |
-          docker run -d -p 3000:3000 --name test-app demo-app:latest
+          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           sleep 10
           curl -f http://localhost:3000/health || exit 1
           docker stop test-app
 
-      - name: Trivy Security Scan
+      - name: Save Docker Image
+        run: docker save ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o app-image.tar
+
+      - name: Upload Docker Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: app-image.tar
+          retention-days: 1
+
+# =====================================================
+# STAGE 2: SECURITY & QUALITY CHECKS
+# =====================================================
+  security-scan:
+    name: Security & Quality Checks
+    needs: build
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Docker Image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker Image
+        run: docker load -i app-image.tar
+
+      - name: Run Trivy Security Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: demo-app:latest
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
 
-      - name: Upload to GitHub Security
+      - name: Upload Trivy Results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
-  all-checks:
-    needs: [validate, build-and-scan]
+# =====================================================
+# STAGE 3: TERRAFORM CHECKS
+# =====================================================
+  terraform-checks:
+    name: Terraform Validation & Security
     runs-on: ubuntu-latest
+    env:
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+
     steps:
-      - name: ✅ All checks passed
-        run: echo "Ready to merge!"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: infra
+        run: terraform validate
+
+      - name: Terraform Format Check
+        working-directory: infra
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Plan (No Apply)
+        working-directory: infra
+        run: terraform plan -out=tfplan
+
+      - name: Checkov Security Scan
+        run: |
+          pip install checkov
+          checkov -d infra/ --quiet --compact
+
+# =====================================================
+# STAGE 4: ALL CHECKS PASSED
+# =====================================================
+  all-checks-passed:
+    name: All Checks Passed
+    needs: [build, security-scan, terraform-checks]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: ✅ All PR validations passed
+        run: echo "✅ Ready to merge - All security and validation checks passed!"
