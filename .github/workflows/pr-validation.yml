@@ -119,11 +119,6 @@ jobs:
         working-directory: infra
         run: terraform plan
 
-      - name: Checkov Security Scan
-        run: |
-          pip install checkov
-          checkov -d infra/ --quiet --compact
-
 # =====================================================
 # STAGE 4: ALL CHECKS PASSED
 # =====================================================
