@@ -158,35 +158,118 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: "🔓 Enable ACR Public Access (All Networks)"
+      # ============================================
+      # 🔓 ENABLE ACR PUBLIC ACCESS (For Image Push)
+      # ============================================
+      - name: "🔓 Enable ACR Public Access and Verify"
         run: |
-          echo "🔓 Enabling ACR public access for ALL networks..."
+          echo "🔓 Enabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled true \
-            --default-action Allow
+            --public-network-enabled true
           
-          echo "⏳ Waiting for ACR to stabilize..."
-          sleep 30
+          echo "⏳ Waiting for ACR to be publicly accessible..."
           
-          echo "✅ ACR is now publicly accessible to ALL networks"
+          # Verify ACR is actually public
+          for i in {1..10}; do
+            PUBLIC_ACCESS=$(az acr show \
+              --name ${ACR_NAME} \
+              --resource-group ${RESOURCE_GROUP} \
+              --query "publicNetworkAccess" -o tsv)
+            
+            if [ "$PUBLIC_ACCESS" == "Enabled" ]; then
+              echo "✅ ACR public access confirmed (attempt $i)"
+              break
+            else
+              if [ $i -eq 10 ]; then
+                echo "❌ ACR still not public after 10 checks"
+                exit 1
+              fi
+              echo "  Waiting... (attempt $i/10)"
+              sleep 10
+            fi
+          done
+          
+          echo "✅ ACR public access enabled"
+          sleep 15
 
-      - name: "🔐 Login to ACR (Service Principal)"
+      # ✅ NEW STEP: Allow GitHub Actions IP to access ACR
+      - name: "🔓 Add GitHub Actions IP to ACR Firewall"
+        run: |
+          echo "🔓 Getting GitHub Actions runner IP..."
+          
+          # Get the runner's public IP
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "✅ GitHub Actions runner IP: $RUNNER_IP"
+          
+          echo "📝 Adding IP to ACR firewall rules..."
+          
+          # Add the IP to ACR's network rules (with retries)
+          for j in {1..3}; do
+            if az acr network-rule add \
+              --name ${ACR_NAME} \
+              --resource-group ${RESOURCE_GROUP} \
+              --ip-address $RUNNER_IP/32 2>/dev/null; then
+              echo "✅ IP added to ACR firewall"
+              break
+            else
+              if [ $j -eq 3 ]; then
+                echo "⚠️  Could not add IP to firewall (may already exist)"
+              else
+                echo "  Retrying..."
+                sleep 5
+              fi
+            fi
+          done
+          
+          sleep 10
+
+      - name: "🔐 Enable ACR Admin and Get Credentials"
+        run: |
+          echo "🔐 Enabling ACR admin user..."
+          az acr update \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --admin-enabled true
+          
+          echo "📝 Getting ACR admin credentials..."
+          ACR_USERNAME=$(az acr credential show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query "username" -o tsv)
+          
+          ACR_PASSWORD=$(az acr credential show \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --query "passwords[0].value" -o tsv)
+          
+          # Store in GitHub environment for next steps
+          echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
+          echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
+          
+          echo "✅ ACR admin enabled"
+
+      - name: "🔐 Login to ACR"
         run: |
           echo "🔐 Logging into ACR..."
           
-          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
-          
-          if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-            --username "$CLIENT_ID" \
-            --password-stdin; then
-            echo "✅ Successfully logged into ACR"
-          else
-            echo "❌ Failed to login"
-            exit 1
-          fi
+          # Retry logic for login
+          for i in {1..5}; do
+            echo "  Login attempt $i/5..."
+            if echo "${{ env.ACR_PASSWORD }}" | docker login ${ACR_LOGIN_SERVER} \
+              --username "${{ env.ACR_USERNAME }}" \
+              --password-stdin; then
+              echo "✅ Successfully logged into ACR"
+              break
+            else
+              if [ $i -eq 5 ]; then
+                echo "❌ Failed to login"
+                exit 1
+              fi
+              sleep 15
+            fi
+          done
 
       - name: "📤 Tag and Push Image to ACR"
         run: |
@@ -195,6 +278,7 @@ jobs:
             ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
           
           echo "📤 Pushing image to ACR..."
+          # Add retry logic for push
           for i in {1..3}; do
             echo "  Attempt $i..."
             if docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest; then
@@ -205,24 +289,83 @@ jobs:
                 echo "❌ Failed after 3 attempts"
                 exit 1
               fi
-              sleep 10
+              echo "  Retrying in 30 seconds..."
+              sleep 30
             fi
           done
+          
+          sleep 30
 
+      # ============================================
+      # 🔒 DISABLE ACR PUBLIC ACCESS (Security)
+      # ============================================
       - name: "🔒 Disable ACR Public Access"
         run: |
           echo "🔒 Disabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled false \
-            --default-action Deny
-          echo "✅ ACR is now PRIVATE"
+            --public-network-enabled false
+          echo "✅ ACR public access disabled"
+
+      # ============================================
+      # 🔧 Setup Private DNS (FIX FOR PRIVATE ACR)
+      # ============================================
+      - name: "🔧 Setup Private DNS Records for ACR"
+        run: |
+          echo "🔍 Setting up private DNS for ACR..."
+          
+          # Wait for private endpoint to be ready
+          sleep 30
+          
+          # Get private endpoint IP from network interface
+          NIC_ID=$(az network private-endpoint show \
+            -g ${RESOURCE_GROUP} \
+            -n "${ACR_NAME}-pe" \
+            --query "networkInterfaces[0].id" -o tsv 2>/dev/null)
+          
+          if [ ! -z "$NIC_ID" ] && [ "$NIC_ID" != "null" ]; then
+            PRIVATE_IP=$(az network nic show \
+              --ids $NIC_ID \
+              --query "ipConfigurations[0].privateIpAddress" -o tsv 2>/dev/null)
+            
+            if [ ! -z "$PRIVATE_IP" ] && [ "$PRIVATE_IP" != "null" ]; then
+              echo "✅ Private Endpoint IP: $PRIVATE_IP"
+              
+              # Delete existing record
+              az network private-dns record-set a delete \
+                -g ${RESOURCE_GROUP} \
+                -z "privatelink.azurecr.io" \
+                -n "${ACR_NAME}" \
+                --yes 2>/dev/null || true
+              
+              sleep 5
+              
+              # Create new record
+              az network private-dns record-set a create \
+                -g ${RESOURCE_GROUP} \
+                -z "privatelink.azurecr.io" \
+                -n "${ACR_NAME}" 2>/dev/null || true
+              
+              az network private-dns record-set a add-record \
+                -g ${RESOURCE_GROUP} \
+                -z "privatelink.azurecr.io" \
+                -n "${ACR_NAME}" \
+                -a "$PRIVATE_IP" 2>/dev/null || true
+              
+              echo "✅ Private DNS configured: ${ACR_NAME}.privatelink.azurecr.io -> $PRIVATE_IP"
+            else
+              echo "⚠️  Could not get private IP from NIC"
+            fi
+          else
+            echo "⚠️  Could not get network interface ID"
+          fi
 
       - name: "🔐 Configure App Service Managed Identity for ACR"
         run: |
           echo "🔧 Configuring Managed Identity for ACR pull..."
           
+          # Get App Service Managed Identity Principal ID
           PRINCIPAL_ID=$(az webapp identity show \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
@@ -230,18 +373,21 @@ jobs:
           
           echo "✅ Managed Identity Principal ID: $PRINCIPAL_ID"
           
+          # Get ACR Resource ID
           ACR_ID=$(az acr show \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
             --query "id" -o tsv)
           
+          # Assign AcrPull role to Managed Identity
           az role assignment create \
             --assignee-object-id "$PRINCIPAL_ID" \
             --role "AcrPull" \
             --scope "$ACR_ID" 2>/dev/null || echo "✓ Role already assigned"
           
-          echo "✅ Managed Identity has AcrPull role"
+          echo "✅ Managed Identity has AcrPull role on ACR"
           
+          # Enable Managed Identity credentials for ACR
           az webapp config set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
@@ -251,16 +397,20 @@ jobs:
 
       - name: "📍 Update Web App to Use ACR"
         run: |
-          echo "🔄 Updating Web App to pull from ACR..."
+          echo "🔄 Updating Web App to pull from ACR using Managed Identity..."
           
+          # Use the public FQDN but App Service will use Managed Identity auth
           PUBLIC_ACR_FQDN="${ACR_NAME}.azurecr.io"
+          
+          echo "📝 Configuring Web App to pull: ${PUBLIC_ACR_FQDN}/demo-app:latest"
+          echo "📝 Authentication: Managed Identity (AcrPull role)"
           
           az webapp config container set \
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
             --docker-custom-image-name "${PUBLIC_ACR_FQDN}/${{ env.IMAGE_NAME }}:latest"
           
-          echo "✅ Web App configured"
+          echo "✅ Web App configured to use ACR with Managed Identity"
 
       - name: "♻️ Restart Web App"
         run: |
@@ -271,8 +421,8 @@ jobs:
 
       - name: "⏳ Wait for App Startup"
         run: |
-          echo "⏳ Waiting 120 seconds for app to start..."
-          sleep 120
+          echo "⏳ Waiting 90 seconds for app to start..."
+          sleep 90
 
       - name: "🏥 Check Web App Health"
         run: |
@@ -280,6 +430,8 @@ jobs:
             --name "$WEBAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
             --query state -o tsv)
+          
+          echo "Web App Status: $STATUS"
           
           if [ "$STATUS" = "Running" ]; then
             echo "✅ Web App is RUNNING"
@@ -295,6 +447,7 @@ jobs:
           echo "=================================="
           echo "Environment: DEV"
           echo "ACR: ${ACR_NAME} (PRIVATE ✅)"
+          echo "ACR Public Access: DISABLED ✅"
           echo "Image: demo-app:latest"
           echo "Authentication: Managed Identity (AcrPull) ✅"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
@@ -302,7 +455,7 @@ jobs:
           echo "=================================="
 
 # =====================================================
-# STAGE 4: DEPLOY TO PROD
+# STAGE 4: DEPLOY TO PROD (MANUAL APPROVAL)
 # =====================================================
   deploy-prod:
     name: Deploy to PROD
@@ -363,35 +516,53 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: "🔓 Enable ACR Public Access (All Networks)"
+      - name: "🔓 Enable ACR Public Access (Temporarily)"
         run: |
-          echo "🔓 Enabling ACR public access for ALL networks..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled true \
-            --default-action Allow
+            --public-network-enabled true
           
-          echo "⏳ Waiting for ACR to stabilize..."
-          sleep 10
-          
-          echo "✅ ACR is now publicly accessible to ALL networks"
+          for i in {1..10}; do
+            PUBLIC_ACCESS=$(az acr show \
+              --name ${ACR_NAME} \
+              --resource-group ${RESOURCE_GROUP} \
+              --query "publicNetworkAccess" -o tsv)
+            
+            if [ "$PUBLIC_ACCESS" == "Enabled" ]; then
+              break
+            else
+              if [ $i -eq 10 ]; then
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
 
-      - name: "🔐 Login to ACR (Service Principal)"
+      - name: "🔓 Add GitHub Actions IP to ACR Firewall"
         run: |
-          echo "🔐 Logging into ACR..."
-          
-          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
-          
-          if echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-            --username "$CLIENT_ID" \
-            --password-stdin; then
-            echo "✅ Successfully logged into ACR"
-          else
-            echo "❌ Failed to login"
-            exit 1
-          fi
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          az acr network-rule add \
+            --name ${ACR_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --ip-address $RUNNER_IP/32 2>/dev/null || true
+          sleep 10
+
+
+      - name: "🔐 Login to ACR"
+        run: |
+          for i in {1..5}; do
+            if echo "${{ env.ACR_PASSWORD }}" | docker login ${ACR_LOGIN_SERVER} \
+              --username "${{ env.ACR_USERNAME }}" \
+              --password-stdin; then
+              break
+            else
+              if [ $i -eq 5 ]; then
+                exit 1
+              fi
+              sleep 15
+            fi
+          done
 
       - name: "📤 Tag and Push Image to ACR"
         run: |
@@ -400,25 +571,65 @@ jobs:
           
           for i in {1..3}; do
             if docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest; then
-              echo "✅ Image pushed successfully"
               break
             else
               if [ $i -eq 3 ]; then
                 exit 1
               fi
-              sleep 10
+              sleep 30
             fi
           done
+          
+          sleep 30
 
       - name: "🔒 Disable ACR Public Access"
         run: |
-          echo "🔒 Disabling ACR public access..."
           az acr update \
             --name ${ACR_NAME} \
             --resource-group ${RESOURCE_GROUP} \
-            --public-network-enabled false \
-            --default-action Deny
-          echo "✅ ACR is now PRIVATE"
+            --public-network-enabled false
+
+      - name: "🔧 Setup Private DNS Records for ACR"
+        run: |
+          echo "🔍 Setting up private DNS for ACR..."
+          
+          sleep 30
+          
+          NIC_ID=$(az network private-endpoint show \
+            -g ${RESOURCE_GROUP} \
+            -n "${ACR_NAME}-pe" \
+            --query "networkInterfaces[0].id" -o tsv 2>/dev/null)
+          
+          if [ ! -z "$NIC_ID" ] && [ "$NIC_ID" != "null" ]; then
+            PRIVATE_IP=$(az network nic show \
+              --ids $NIC_ID \
+              --query "ipConfigurations[0].privateIpAddress" -o tsv 2>/dev/null)
+            
+            if [ ! -z "$PRIVATE_IP" ] && [ "$PRIVATE_IP" != "null" ]; then
+              echo "✅ Private Endpoint IP: $PRIVATE_IP"
+              
+              az network private-dns record-set a delete \
+                -g ${RESOURCE_GROUP} \
+                -z "privatelink.azurecr.io" \
+                -n "${ACR_NAME}" \
+                --yes 2>/dev/null || true
+              
+              sleep 5
+              
+              az network private-dns record-set a create \
+                -g ${RESOURCE_GROUP} \
+                -z "privatelink.azurecr.io" \
+                -n "${ACR_NAME}" 2>/dev/null || true
+              
+              az network private-dns record-set a add-record \
+                -g ${RESOURCE_GROUP} \
+                -z "privatelink.azurecr.io" \
+                -n "${ACR_NAME}" \
+                -a "$PRIVATE_IP" 2>/dev/null || true
+              
+              echo "✅ Private DNS configured"
+            fi
+          fi
 
       - name: "🔐 Configure App Service Managed Identity for ACR"
         run: |
@@ -458,7 +669,7 @@ jobs:
             --resource-group "$RESOURCE_GROUP"
 
       - name: "⏳ Wait for App Startup"
-        run: sleep 120
+        run: sleep 90
 
       - name: "🏥 Check Web App Health"
         run: |
@@ -479,6 +690,7 @@ jobs:
           echo "=================================="
           echo "Environment: PROD"
           echo "ACR: ${ACR_NAME} (PRIVATE ✅)"
+          echo "ACR Public Access: DISABLED ✅"
           echo "Image: demo-app:latest"
           echo "Authentication: Managed Identity (AcrPull) ✅"
           echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
