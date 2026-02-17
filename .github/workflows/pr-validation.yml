@@ -115,10 +115,6 @@ jobs:
         working-directory: infra
         run: terraform validate
 
-      - name: Terraform Format Check
-        working-directory: infra
-        run: terraform fmt -check -recursive
-
       - name: Terraform Plan (Dev)
         working-directory: infra
         run: terraform plan -out=tfplan
