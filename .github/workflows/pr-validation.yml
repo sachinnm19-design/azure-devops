@@ -6,14 +6,48 @@ on:
       - main
 
 jobs:
-  build-and-scan:
+  validate:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.3.0
+
+      - name: Terraform Validate
+        working-directory: infra
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Terraform Format Check
+        working-directory: infra
+        run: terraform fmt -check -recursive
+
+      - name: Checkov Security Scan
+        run: |
+          pip install checkov
+          checkov -d infra/ --quiet --compact
+
+  build-and-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Docker Image
-        run: docker build -t demo-app:latest ./app
+        run: |
+          docker build \
+            -t demo-app:latest \
+            ./app
 
       - name: Local Container Test
         run: |
@@ -35,18 +69,9 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-      - name: Terraform Validate
-        working-directory: infra
-        run: |
-          terraform init -backend=false
-          terraform validate
-
-      - name: Checkov Security Scan
-        run: checkov -d infra/ --quiet --compact
-
-  # Block merge if any check fails
-  all-checks-passed:
-    needs: [build-and-scan]
+  all-checks:
+    needs: [validate, build-and-scan]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "✅ All PR checks passed"
+      - name: ✅ All checks passed
+        run: echo "Ready to merge!"
