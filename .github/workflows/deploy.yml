@@ -159,25 +159,6 @@ jobs:
           echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
 
-      - name: Ensure Service Principal has ACR Push Permission (DEV)
-        run: |
-          echo "🔐 Ensuring Service Principal has AcrPush role..."
-          
-          ACR_ID=$(az acr show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query id -o tsv)
-          
-          SP_OBJECT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          
-          az role assignment create \
-            --assignee-object-id "$SP_OBJECT_ID" \
-            --role "AcrPush" \
-            --scope "$ACR_ID" \
-            --allow-no-subscriptions 2>/dev/null || echo "✓ Role already assigned"
-          
-          echo "✅ Service Principal has AcrPush role"
-
       - name: Login to ACR (DEV)
         run: |
           echo "🔐 Logging into ACR..."
