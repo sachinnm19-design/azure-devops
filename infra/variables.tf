@@ -55,31 +55,3 @@ variable "ip_restrictions" {
   default     = []
   description = "List of IP addresses allowed to access the web app"
 }
-
-############################################
-# ✅ NEW VARIABLES - ACR & NETWORKING
-############################################
-
-variable "acr_public_access_enabled" {
-  type        = bool
-  description = "Enable public network access for ACR (controlled by pipeline). Set to false for private, true during CI/CD execution."
-  default     = false
-}
-
-variable "vnet_address_space" {
-  type        = string
-  description = "Address space for Virtual Network"
-  default     = "10.0.0.0/16"
-}
-
-variable "app_service_subnet_prefix" {
-  type        = string
-  description = "Address prefix for App Service subnet"
-  default     = "10.0.1.0/24"
-}
-
-variable "private_endpoint_subnet_prefix" {
-  type        = string
-  description = "Address prefix for private endpoint subnet"
-  default     = "10.0.2.0/24"
-}
