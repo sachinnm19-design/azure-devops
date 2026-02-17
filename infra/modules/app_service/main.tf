@@ -38,9 +38,11 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   site_config {
+
+    container_registry_use_managed_identity = true
     # ✅ Docker configuration via application_stack
     application_stack {
-      docker_image_name   = "${var.image_name}:${var.image_tag}"
+      docker_image_name   = "${var.acr_login_server}/${var.image_name}:${var.image_tag}"
       docker_registry_url = "https://${var.acr_login_server}"
       # ✅ NO username/password - Managed Identity will handle authentication
     }
