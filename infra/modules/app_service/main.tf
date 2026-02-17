@@ -15,9 +15,6 @@ resource "azurerm_linux_web_app" "webapp" {
   service_plan_id     = azurerm_service_plan.asp.id
   https_only          = true
 
-  # ✅ VNET Integration for private ACR access
-  virtual_network_subnet_id = var.app_service_subnet_id
-
   # ✅ System-Assigned Managed Identity (for ACR access)
   identity {
     type = "SystemAssigned"
@@ -41,8 +38,6 @@ resource "azurerm_linux_web_app" "webapp" {
   }
 
   site_config {
-    vnet_route_all_enabled = true
-    container_registry_use_managed_identity = true
     # ✅ Docker configuration via application_stack
     application_stack {
       docker_image_name   = "${var.image_name}:${var.image_tag}"
@@ -100,7 +95,6 @@ resource "azurerm_linux_web_app" "webapp" {
       # Application settings
       "ENVIRONMENT"                               = var.environment
       "APP_VERSION"                               = var.image_tag
-      "WEBSITE_PULL_IMAGE_OVER_VNET"              = "1"
     },
     var.additional_app_settings
   )
