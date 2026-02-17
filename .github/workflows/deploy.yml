@@ -1,4 +1,4 @@
-name: Multi-Stage CI/CD Pipeline
+name: Deploy to Azure
 
 on:
   push:
@@ -9,14 +9,16 @@ on:
 env:
   IMAGE_NAME: demo-app
   IMAGE_TAG: latest
+  TF_WORKSPACE: dev
 
 jobs:
 # =====================================================
-# STAGE 1: BUILD
+# DEPLOY TO DEV
 # =====================================================
-  build:
-    name: Build & Test
+  deploy-dev:
+    name: Deploy to DEV
     runs-on: ubuntu-latest
+    environment: dev
 
     steps:
       - name: Checkout repository
@@ -31,386 +33,113 @@ jobs:
             -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             ./app
 
-      - name: Test Container Locally
-        run: |
-          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          sleep 10
-          curl -f http://localhost:3000/health || exit 1
-          docker stop test-app
-
-      - name: Save Docker Image
-        run: docker save ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o app-image.tar
-
-      - name: Upload Docker Image Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: app-image.tar
-          retention-days: 1
-
-# =====================================================
-# STAGE 2: SECURITY & QUALITY CHECKS
-# =====================================================
-  security-scan:
-    name: Security & Quality Checks
-    needs: build
-    runs-on: ubuntu-latest
-    
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download Docker Image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-
-      - name: Load Docker Image
-        run: docker load -i app-image.tar
-
-      - name: Run Trivy Security Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload Trivy Results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        continue-on-error: true
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform Validate
-        working-directory: infra
-        run: |
-          terraform init -backend=false
-          terraform validate
-
-# =====================================================
-# STAGE 3: DEPLOY TO DEV
-# =====================================================
-  deploy-dev:
-    name: Deploy to DEV
-    needs: [build, security-scan]
-    runs-on: ubuntu-latest
-    environment: dev
-
-    env:
-      TF_WORKSPACE: dev
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download Docker Image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-
-      - name: Load Docker Image
-        run: docker load -i app-image.tar
-
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Login to ACR
+        run: |
+          az acr login --name devopsdemoacacdev2235
+
+      - name: Push to ACR
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            devopsdemoacacdev2235.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push devopsdemoacacdev2235.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_wrapper: false
-
-      - name: Configure Terraform Cloud Token
-        run: |
-          cat > ~/.terraformrc <<'EOF'
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOF
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Terraform Init
         working-directory: infra
-        run: terraform init -upgrade
-
-      - name: Terraform Plan
-        working-directory: infra
-        run: terraform plan
+        run: terraform init
 
       - name: Terraform Apply
         working-directory: infra
         run: terraform apply -auto-approve
 
-      - name: Export Terraform Outputs
-        working-directory: infra
+      - name: Verify App Health
         run: |
-          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
-
-      - name: Login to ACR (DEV)
-        run: |
-          echo "🔐 Logging into ACR..."
+          echo "⏳ Waiting for app to be ready..."
+          sleep 15
           
-          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
+          WEBAPP_URL=$(az webapp show \
+            --name devops-demo-webapp-dev \
+            --resource-group devops-demo-rg-dev \
+            --query defaultHostName -o tsv)
           
-          echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-            --username "$CLIENT_ID" \
-            --password-stdin
-          
-          echo "✅ Successfully logged into ACR"
-
-      - name: Tag and Push Image to ACR (DEV)
-        run: |
-          echo "🏷️  Tagging Docker images..."
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
-          
-          echo "📤 Pushing images to ACR..."
-          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
-          
-          echo "✅ Images pushed successfully"
-
-      - name: Restart Web App (DEV)
-        run: |
-          echo "♻️  Restarting Web App..."
-          az webapp restart \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
-
-      - name: Wait for App Startup (DEV)
-        run: |
-          echo "⏳ Waiting 40 seconds for app to start..."
-          sleep 40
-
-      - name: Check Web App Health Status (DEV)
-        run: |
-          echo "🏥 Checking Web App health status..."
-          
-          STATUS=$(az webapp show \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query state -o tsv)
-          
-          echo "Web App Status: $STATUS"
-          
-          if [ "$STATUS" = "Running" ]; then
-            echo "✅ Web App is running"
-          else
-            echo "⚠️  Web App status: $STATUS"
-          fi
-
-      - name: View Application Logs (DEV)
-        if: always()
-        continue-on-error: true
-        run: |
-          echo "📋 Fetching application logs..."
-          az webapp log tail \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --timeout 30 || echo "⚠️  Could not fetch logs"
-
-      - name: Deployment Summary (DEV)
-        if: success()
-        run: |
-          echo "🎉 DEV Deployment completed successfully!"
-          echo "=================================="
-          echo "Environment: DEV"
-          echo "ACR: ${ACR_NAME} (PUBLIC)"
-          echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
-          echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
-          echo "=================================="
+          echo "🔍 Testing health endpoint..."
+          curl -f https://$WEBAPP_URL/health || exit 1
+          echo "✅ App is healthy!"
 
 # =====================================================
-# STAGE 4: DEPLOY TO PROD (MANUAL APPROVAL)
+# DEPLOY TO PROD (Optional - when ready)
 # =====================================================
   deploy-prod:
     name: Deploy to PROD
     needs: deploy-dev
     runs-on: ubuntu-latest
     environment: prod
-
-    env:
-      TF_WORKSPACE: prod
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download Docker Image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Load Docker Image
-        run: docker load -i app-image.tar
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            ./app
 
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Login to ACR
+        run: |
+          az acr login --name devopsdemoacacprod2235
+
+      - name: Push to ACR
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            devopsdemoacacprod2235.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push devopsdemoacacprod2235.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_wrapper: false
-
-      - name: Configure Terraform Cloud Token
-        run: |
-          cat > ~/.terraformrc <<'EOF'
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOF
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Terraform Init
         working-directory: infra
-        run: terraform init -upgrade
-
-      - name: Terraform Plan
-        working-directory: infra
-        run: terraform plan
+        env:
+          TF_WORKSPACE: prod
+        run: terraform init
 
       - name: Terraform Apply
         working-directory: infra
+        env:
+          TF_WORKSPACE: prod
         run: terraform apply -auto-approve
 
-      - name: Export Terraform Outputs
-        working-directory: infra
+      - name: Verify App Health
         run: |
-          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
-
-      - name: Ensure Service Principal has ACR Push Permission (PROD)
-        run: |
-          echo "🔐 Ensuring Service Principal has AcrPush role..."
+          echo "⏳ Waiting for app to be ready..."
+          sleep 15
           
-          ACR_ID=$(az acr show \
-            --name ${ACR_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --query id -o tsv)
+          WEBAPP_URL=$(az webapp show \
+            --name devops-demo-webapp-prod \
+            --resource-group devops-demo-rg-prod \
+            --query defaultHostName -o tsv)
           
-          SP_OBJECT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          
-          az role assignment create \
-            --assignee-object-id "$SP_OBJECT_ID" \
-            --role "AcrPush" \
-            --scope "$ACR_ID" \
-            --allow-no-subscriptions 2>/dev/null || echo "✓ Role already assigned"
-          
-          echo "✅ Service Principal has AcrPush role"
-
-      - name: Login to ACR (PROD)
-        run: |
-          echo "🔐 Logging into ACR..."
-          
-          CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId')
-          CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientSecret')
-          
-          echo "$CLIENT_SECRET" | docker login ${ACR_LOGIN_SERVER} \
-            --username "$CLIENT_ID" \
-            --password-stdin
-          
-          echo "✅ Successfully logged into ACR"
-
-      - name: Tag and Push Image to ACR (PROD)
-        run: |
-          echo "🏷️  Tagging Docker images for PROD..."
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
-          
-          echo "📤 Pushing images to PROD ACR..."
-          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:latest
-          
-          echo "✅ Images pushed successfully"
-
-      - name: Configure Web App Managed Identity for ACR (PROD)
-        run: |
-          echo "🔧 Configuring Web App to use Managed Identity for ACR..."
-          az webapp config set \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --generic-configurations '{"acrUseManagedIdentityCreds": true}'
-          
-          echo "✅ Web App Managed Identity configured"
-
-      - name: Update Web App Container Image (PROD)
-        run: |
-          echo "🔄 Updating Web App container image..."
-          az webapp config container set \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --docker-custom-image-name "${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" \
-            --docker-registry-server-url "https://${ACR_LOGIN_SERVER}"
-
-      - name: Restart Web App (PROD)
-        run: |
-          echo "♻️  Restarting Web App..."
-          az webapp restart \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
-
-      - name: Wait for App Startup (PROD)
-        run: |
-          echo "⏳ Waiting 40 seconds for app to start..."
-          sleep 40
-
-      - name: Check Web App Health Status (PROD)
-        run: |
-          echo "🏥 Checking Web App health status..."
-          
-          STATUS=$(az webapp show \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query state -o tsv)
-          
-          echo "Web App Status: $STATUS"
-          
-          if [ "$STATUS" = "Running" ]; then
-            echo "✅ Web App is running"
-          else
-            echo "⚠️  Web App status: $STATUS"
-          fi
-
-      - name: View Application Logs (PROD)
-        if: always()
-        continue-on-error: true
-        run: |
-          echo "📋 Fetching application logs..."
-          az webapp log tail \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --timeout 30 || echo "⚠️  Could not fetch logs"
-
-      - name: Deployment Summary (PROD)
-        if: success()
-        run: |
-          echo "🎉 PROD Deployment completed successfully!"
-          echo "=================================="
-          echo "Environment: PROD"
-          echo "ACR: ${ACR_NAME} (PUBLIC)"
-          echo "Image: ${ACR_LOGIN_SERVER}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          echo "Web App: https://${WEBAPP_NAME}.azurewebsites.net"
-          echo "Health: https://${WEBAPP_NAME}.azurewebsites.net/health"
-          echo "=================================="
+          echo "🔍 Testing health endpoint..."
+          curl -f https://$WEBAPP_URL/health || exit 1
+          echo "✅ App is healthy!"
