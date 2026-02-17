@@ -117,7 +117,7 @@ jobs:
 
       - name: Terraform Plan (Dev)
         working-directory: infra
-        run: terraform plan -out=tfplan
+        run: terraform plan
 
       - name: Checkov Security Scan
         run: |
