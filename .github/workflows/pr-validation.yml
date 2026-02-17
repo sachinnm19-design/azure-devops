@@ -1,4 +1,4 @@
-name: CI – PR Validation
+name: PR Checks & Security Scanning
 
 on:
   pull_request:
@@ -6,35 +6,47 @@ on:
       - main
 
 jobs:
-  pr-validate:
+  build-and-scan:
     runs-on: ubuntu-latest
-
-    env:
-      TF_WORKSPACE: dev
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Build Docker Image
+        run: docker build -t demo-app:latest ./app
 
-      - name: Configure Terraform Cloud Token
+      - name: Local Container Test
         run: |
-          cat > ~/.terraformrc <<'EOF'
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOF
+          docker run -d -p 3000:3000 --name test-app demo-app:latest
+          sleep 10
+          curl -f http://localhost:3000/health || exit 1
+          docker stop test-app
 
-      # ✅ Now init knows which workspace to use
-      - name: Terraform Init
+      - name: Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: demo-app:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Terraform Validate
         working-directory: infra
-        run: terraform init -upgrade
+        run: |
+          terraform init -backend=false
+          terraform validate
 
-      - name: Terraform Plan (DEV)
-        working-directory: infra
-        run: terraform plan
+      - name: Checkov Security Scan
+        run: checkov -d infra/ --quiet --compact
 
-      - name: Docker Build Validation
-        run: docker build -t pr-validate ./app
+  # Block merge if any check fails
+  all-checks-passed:
+    needs: [build-and-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "✅ All PR checks passed"
