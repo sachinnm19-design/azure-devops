@@ -41,12 +41,12 @@ This project demonstrates a complete DevOps workflow with:
 
 - **Cloud Platform:** Microsoft Azure
 - **IaC Tool:** Terraform
-- **Container Registry:** Azure Container Registry (ACR)
+- **Container Registry:** Azure Container Registry (ACR) - Public Access
 - **Compute:** Azure App Service (Linux Containers)
 - **Monitoring:** Application Insights + Log Analytics
 - **Security:** Azure Key Vault, Managed Identities
 - **CI/CD:** GitHub Actions
-- **Application:** Python Flask (containerized)
+- **Application:** Python Flask with Gunicorn (Production-Ready)
 
 ---
 
@@ -72,7 +72,7 @@ This project demonstrates a complete DevOps workflow with:
 │  │   Build   │→ │Security Scan │→ │  Terraform │→ │ Deploy  │ │
 │  │  & Test   │  │   (Trivy)    │  │   Apply    │  │  to App │ │
 │  └───────────┘  └──────────────┘  └────────────┘  └─────────┘ │
-└────────────────────────────┬────────────────────────────────────┘
+└────────────────��───────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -87,7 +87,7 @@ This project demonstrates a complete DevOps workflow with:
 │  │  │  ┌──────────────┐  │      │  ┌──────────────────┐  │  │  │
 │  │  │  │Docker Images │  │      │  │   Web App        │  │  │  │
 │  │  │  │  - Flask App │  │─────▶│  │  (Container)     │  │  │  │
-│  │  │  └──────────────┘  │      │  └──────────────────┘  │  │  │
+│  │  │  └──��───────────┘  │      │  └──────────────────┘  │  │  │
 │  │  └────────────────────┘      └────────────────────────┘  │  │
 │  │                                                            │  │
 │  │  ┌────────────────────┐      ┌────────────────────────┐  │  │
@@ -143,11 +143,10 @@ This project demonstrates a complete DevOps workflow with:
 
 ### **Infrastructure & Platform**
 
-- ✅ **Multi-environment support** (dev, staging, prod)
+- ✅ **Multi-environment support** (dev, prod)
 - ✅ **Modular Terraform code** for reusability
-- ✅ **Azure Container Registry** for image storage
+- ✅ **Azure Container Registry** for image storage (Public Access)
 - ✅ **App Service with Linux containers**
-- ✅ **Virtual Network** integration ready
 - ✅ **Network Security Groups** for traffic control
 
 ### **Security**
@@ -214,7 +213,6 @@ This project demonstrates a complete DevOps workflow with:
 │   ├── variables.tf                # Input variables
 │   ├── outputs.tf                  # Output values
 │   ├── datasources.tf              # Data sources
-│   ├── monitoring.tf               # Monitoring alerts
 │   │
 │   ├── modules/
 │   │   ├── acr/                    # Container Registry module
@@ -438,7 +436,7 @@ The Web App uses **System-Assigned Managed Identity** for:
 #### **ACR Module** (`modules/acr`)
 - Container Registry provisioning
 - SKU selection (Basic/Standard/Premium)
-- Public/private access control
+- Public access enabled for image pulls
 - Admin user management
 
 #### **App Service Module** (`modules/app_service`)
@@ -451,10 +449,9 @@ The Web App uses **System-Assigned Managed Identity** for:
 - Logging configuration
 
 #### **Networking Module** (`modules/networking`)
-- Virtual Network (optional)
-- Subnets
 - Network Security Groups
 - Security rules
+- Configurable creation
 
 ### **Terraform Commands**
 
@@ -1478,5 +1475,5 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated:** 2024-02-11  
+**Last Updated:** 2026-02-17  
 **Version:** 1.0.0
