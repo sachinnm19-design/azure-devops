@@ -8,7 +8,7 @@ on:
 
 env:
   IMAGE_NAME: demo-app
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: latest
 
 jobs:
 # =====================================================
