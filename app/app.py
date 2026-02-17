@@ -1,19 +1,18 @@
 from flask import Flask, jsonify
-import logging
-import sys
 
 app = Flask(__name__)
 
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
 
-@app.get("/health")
+@app.route("/health")
 def health():
-    logging.info("Health called")
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "ok"})
 
-@app.get("/")
+
+@app.route("/")
 def home():
-    return jsonify({"message": "Demo app running"}), 200
+    return "Hello from Azure Web App for Containers via GitHub Actions & Terraform!"
+
+
+if __name__ == "__main__":
+    # Runs on port 3000 and listens on all interfaces
+    app.run(host="0.0.0.0", port=3000)
