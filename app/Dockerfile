@@ -1,4 +1,3 @@
-# Use a small Python base image
 FROM python:3.10-slim
 
 # Set working directory
@@ -9,10 +8,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY app.py .
 
-# Expose application port
+# Expose port
 EXPOSE 3000
 
-# Start the app
-CMD ["python", "app.py"]
+# Use gunicorn for production
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "2", "--threads", "4", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
