@@ -1,14 +1,90 @@
-name: CI – PR Validation
+name: PR Checks & Validation
 
 on:
   pull_request:
     branches:
       - main
 
+env:
+  IMAGE_NAME: demo-app
+  IMAGE_TAG: latest
+  TF_WORKSPACE: dev
+
 jobs:
-  pr-validate:
+# =====================================================
+# STAGE 1: BUILD & TEST
+# =====================================================
+  build:
+    name: Build & Test
     runs-on: ubuntu-latest
 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            ./app
+
+      - name: Test Container Locally
+        run: |
+          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          sleep 10
+          curl -f http://localhost:3000/health || exit 1
+          docker stop test-app
+
+# =====================================================
+# STAGE 2: SECURITY SCANNING (Docker)
+# =====================================================
+  security-scan:
+    name: Security Scan
+    needs: build
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            ./app
+
+      - name: Run Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+# =====================================================
+# STAGE 3: TERRAFORM VALIDATION
+# =====================================================
+  terraform-checks:
+    name: Terraform Validation
+    needs: build
+    runs-on: ubuntu-latest
     env:
       TF_WORKSPACE: dev
 
@@ -18,23 +94,29 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Configure Terraform Cloud Token
-        run: |
-          cat > ~/.terraformrc <<'EOF'
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOF
-
-      # ✅ Now init knows which workspace to use
       - name: Terraform Init
         working-directory: infra
-        run: terraform init -upgrade
+        run: terraform init
 
-      - name: Terraform Plan (DEV)
+      - name: Terraform Validate
+        working-directory: infra
+        run: terraform validate
+
+      - name: Terraform Plan (Dev)
         working-directory: infra
         run: terraform plan
 
-      - name: Docker Build Validation
-        run: docker build -t pr-validate ./app
+# =====================================================
+# STAGE 4: ALL CHECKS PASSED
+# =====================================================
+  all-checks-passed:
+    name: All Checks Passed
+    needs: [build, security-scan, terraform-checks]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: ✅ All PR validations passed
+        run: echo "✅ Ready to merge!"
