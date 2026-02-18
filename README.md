@@ -278,25 +278,6 @@ az ad sp create-for-rbac \
 
 Save the JSON output securely. It will be used in GitHub and Terraform Cloud.
 
-### 6.2 Key Vault Setup
-
-#### 6.2.1 Create Key Vault
-Key Vault is automatically provisioned by Terraform using the configuration in `infra/main.tf`:
-- Key Vault is named dynamically as `<acr_name>-kv` (based on the ACR name).
-- Secrets for ACR credentials (`acr-admin-username`, `acr-admin-password`) are securely populated by Terraform.
-
-#### 6.2.2 Access Policies
-Terraform sets up the Key Vault Access Policies as follows:
-- **Terraform Service Principal:** Full permissions for provisioning and managing secrets.
-- **Web App Managed Identity:** Read-only access (`Get`, `List`) for retrieving secrets at runtime.
-
-To review Access Policies:
-```bash
-az keyvault show --name <key-vault-name> --query properties.accessPolicies
-```
-
----
-
 ## 7. Terraform Cloud Setup
 
 ### 7.1 Create an Organization
@@ -307,9 +288,9 @@ az keyvault show --name <key-vault-name> --query properties.accessPolicies
 Create two workspaces:
 
 | Workspace Name       |
-|-----------------------|
-| devops-demo-dev       |
-| devops-demo-prod      |
+|----------------------|
+| devops-demo-dev      |
+| devops-demo-prod     |
 
 Each workspace represents a separate environment.
 
@@ -989,7 +970,6 @@ hey -n 1000 -c 10 https://$WEBAPP_URL/health
 
 ```bash
 # Get your current public IP
-curl ifconfig.me
 
 # Update infra/main.tf
 ip_restrictions = [
@@ -999,7 +979,7 @@ ip_restrictions = [
 ]
 
 # Redeploy
-terraform apply -var-file="environments/dev.tfvars"
+terraform apply
 ```
 
 #### **Issue: Container fails to start**
@@ -1028,22 +1008,6 @@ az role assignment list \
 az webapp restart \
   --name devops-demo-webapp-dev \
   --resource-group devops-demo-rg-dev
-```
-
-#### **Issue: Terraform state locked**
-
-**Cause:** Previous run didn't complete or release lock.
-
-**Solution:**
-
-```bash
-# View locks
-az storage container list \
-  --account-name <storage-account> \
-  --query "[?name=='tfstate']"
-
-# Force unlock (use with caution)
-terraform force-unlock <LOCK_ID>
 ```
 
 #### **Issue: No logs in Application Insights**
@@ -1088,7 +1052,6 @@ az webapp show \
   --query state
 
 # Review Application Insights for exceptions
-# Azure Portal → Application Insights → Failures
 ```
 
 #### **Issue: CI/CD pipeline failing**
@@ -1138,54 +1101,6 @@ az appservice plan update \
 # Review dependency calls in Application Insights
 ```
 
-#### **Issue: Memory leaks**
-
-**Cause:** Application not releasing resources.
-
-**Solution:**
-
-```bash
-# Monitor memory usage
-az monitor metrics list \
-  --resource <webapp-id> \
-  --metric MemoryPercentage \
-  --start-time 2024-02-11T00:00:00Z \
-  --interval PT1H
-
-# Check Application Insights for memory trends
-# Investigate long-running requests
-# Review application code for resource management
-
-# Restart as temporary fix
-az webapp restart \
-  --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
-```
-
-### **Debugging Commands**
-
-```bash
-# Get all Web App configuration
-az webapp config show \
-  --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
-
-# List all app settings
-az webapp config appsettings list \
-  --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
-
-# Check deployment logs
-az webapp log deployment list \
-  --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
-
-# SSH into container (if enabled)
-az webapp ssh \
-  --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
-```
-
 ---
 
 ## 💡 Best Practices
@@ -1220,7 +1135,6 @@ az webapp ssh \
 - ✅ Implement approval gates for production
 - ✅ Run security scans in pipeline
 - ✅ Test infrastructure changes in dev first
-- ✅ Use semantic versioning for images
 - ✅ Enable rollback capabilities
 - ✅ Monitor pipeline health
 
@@ -1241,169 +1155,7 @@ az webapp ssh \
 - ✅ Enable auto-scaling in production
 - ✅ Clean up unused resources
 - ✅ Use cost alerts
-- ✅ Review Azure Advisor recommendations
-- ✅ Use reserved instances for predictable workloads
 - ✅ Monitor spend with Cost Management
-
----
-
-## 🚀 Future Enhancements
-
-### **Phase 1: Enhanced Infrastructure**
-
-- [ ] Implement Virtual Network with private endpoints
-- [ ] Add Azure Front Door for CDN and WAF
-- [ ] Enable ACR geo-replication
-- [ ] Use Premium App Service Plan with auto-scaling
-- [ ] Implement Azure Private Link for ACR and Key Vault
-- [ ] Add Azure Firewall for advanced security
-- [ ] Deploy multi-region for high availability
-
-### **Phase 2: Advanced Application Features**
-
-- [ ] Implement readiness/liveness probes
-- [ ] Add distributed tracing (OpenTelemetry)
-- [ ] Implement API rate limiting
-- [ ] Add Redis cache for performance
-- [ ] Implement CDN for static assets
-- [ ] Add authentication/authorization (Azure AD)
-- [ ] Implement database integration (Cosmos DB/PostgreSQL)
-
-### **Phase 3: DevOps Maturity**
-
-- [ ] Implement blue-green deployments
-- [ ] Add canary deployment strategy
-- [ ] Implement feature flags
-- [ ] Add automated rollback on failure
-- [ ] Implement chaos engineering tests
-- [ ] Add performance testing in pipeline
-- [ ] Implement GitOps with Flux/ArgoCD
-
-### **Phase 4: Observability**
-
-- [ ] Add custom Application Insights metrics
-- [ ] Implement distributed tracing
-- [ ] Add user analytics
-- [ ] Implement real-user monitoring (RUM)
-- [ ] Add synthetic monitoring
-- [ ] Implement AIOps for anomaly detection
-- [ ] Add cost monitoring and alerts
-
-### **Phase 5: Compliance & Governance**
-
-- [ ] Implement Azure Policy
-- [ ] Add compliance scanning (CIS benchmarks)
-- [ ] Implement audit logging
-- [ ] Add regulatory compliance checks
-- [ ] Implement data classification
-- [ ] Add RBAC hardening
-- [ ] Implement backup and disaster recovery
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how to contribute:
-
-### **1. Fork the Repository**
-
-```bash
-# Click "Fork" on GitHub
-# Then clone your fork
-git clone https://github.com/YOUR-USERNAME/azure-devops.git
-cd azure-devops
-```
-
-### **2. Create a Feature Branch**
-
-```bash
-git checkout -b feature/your-feature-name
-```
-
-### **3. Make Your Changes**
-
-- Follow existing code style
-- Add tests if applicable
-- Update documentation
-- Follow commit message conventions
-
-### **4. Test Your Changes**
-
-```bash
-# Test Terraform changes
-cd infra
-terraform init
-terraform validate
-terraform plan -var-file="environments/dev.tfvars"
-
-# Test application changes
-cd app
-docker build -t demo-app:test .
-docker run -p 3000:3000 demo-app:test
-```
-
-### **5. Commit and Push**
-
-```bash
-git add .
-git commit -m "feat: add new feature"
-git push origin feature/your-feature-name
-```
-
-### **6. Create a Pull Request**
-
-- Go to GitHub and create a PR
-- Describe your changes
-- Link related issues
-- Request review
-
-### **Commit Message Convention**
-
-```
-type(scope): subject
-
-body (optional)
-
-footer (optional)
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation
-- `style`: Formatting
-- `refactor`: Code restructuring
-- `test`: Tests
-- `chore`: Maintenance
-
-**Example:**
-
-```
-feat(monitoring): add Application Insights alerts
-
-- Add high error rate alert
-- Add slow response time alert
-- Add health check failure alert
-- Configure alerts for production only
-
-Closes #123
-```
-
----
-
-## 📄 License
-
-This project is for demonstration and educational purposes.
-
----
-
-## 📞 Support
-
-For issues, questions, or contributions:
-
-- 🐛 **Report bugs:** [GitHub Issues](https://github.com/sachinnm19-design/azure-devops/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/sachinnm19-design/azure-devops/discussions)
-- 📧 **Email:** your-email@example.com
 
 ---
 
@@ -1469,26 +1221,7 @@ For issues, questions, or contributions:
 ✅ Docker containerization  
 ✅ Production-ready with Gunicorn  
 
-### **Next Steps**
 
-- [ ] Add automated testing in CI/CD
-- [ ] Implement blue-green deployments
-- [ ] Add performance testing
-- [ ] Implement distributed tracing
-- [ ] Add API documentation with Swagger
-- [ ] Implement database layer
 
----
-
-**Made with ❤️ for the DevOps Community**
-
-⭐ Star this repository if you found it helpful!
-
-🐛 Found a bug? [Open an issue](https://github.com/sachinnm19-design/azure-devops/issues)
-
-🤝 Want to contribute? Check our [Contributing Guidelines](#-contributing)
-
----
-
-**Last Updated:** 2024-02-11  
+**Last Updated:** 2026-02-18  
 **Version:** 1.0.0
