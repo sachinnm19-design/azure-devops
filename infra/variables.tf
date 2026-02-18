@@ -55,3 +55,38 @@ variable "ip_restrictions" {
   default     = []
   description = "List of IP addresses allowed to access the web app"
 }
+
+# ✅ NEW - Key Vault Configuration Variables
+variable "enable_key_vault_protection" {
+  type        = bool
+  description = "Enable purge protection and soft delete for Key Vault"
+  default     = true
+}
+
+variable "key_vault_sku" {
+  type        = string
+  description = "SKU for Key Vault (standard or premium)"
+  default     = "standard"
+  
+  validation {
+    condition     = contains(["standard", "premium"], var.key_vault_sku)
+    error_message = "Key Vault SKU must be 'standard' or 'premium'"
+  }
+}
+
+variable "soft_delete_retention_days" {
+  type        = number
+  description = "Number of days to retain soft deleted items in Key Vault"
+  default     = 90
+  
+  validation {
+    condition     = var.soft_delete_retention_days >= 7 && var.soft_delete_retention_days <= 90
+    error_message = "Soft delete retention must be between 7 and 90 days"
+  }
+}
+
+variable "enable_purge_protection" {
+  type        = bool
+  description = "Enable purge protection on Key Vault"
+  default     = true
+}

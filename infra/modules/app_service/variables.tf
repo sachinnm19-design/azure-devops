@@ -84,3 +84,14 @@ variable "subscription_id" {
   type        = string
   description = "Azure Subscription ID (from data source azurerm_subscription)"
 }
+
+# ✅ NEW - Key Vault variables
+variable "key_vault_name" {
+  type        = string
+  description = "Name of the Key Vault for secret references"
+}
+
+variable "key_vault_uri" {
+  type        = string
+  description = "URI of the Key Vault for secret references"
+}

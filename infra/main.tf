@@ -51,14 +51,37 @@ module "acr" {
   acr_name              = var.acr_name
   resource_group_name   = azurerm_resource_group.rg.name
   location              = var.location
-  sku                   = "Premium"  # ✅ Premium for better features
-  public_access_enabled = true       # ✅ PUBLIC
+  sku                   = "Premium"
+  public_access_enabled = true
 
   tags = {
     environment = var.environment
   }
 }
 
+############################################
+# Key Vault Module (MUST BE BEFORE app_service)
+############################################
+module "key_vault" {
+  source = "./modules/key_vault"
+
+  key_vault_name                      = "kv-${substr(var.webapp_name, 0, 12)}-${var.environment}"
+  resource_group_name                 = azurerm_resource_group.rg.name
+  location                            = var.location
+  tenant_id                           = data.azurerm_client_config.current.tenant_id
+  webapp_principal_id                 = ""  # ✅ Empty string instead of null (will be set via separate access policy)
+  
+  app_insights_instrumentation_key    = azurerm_application_insights.app_insights.instrumentation_key
+  app_insights_connection_string      = azurerm_application_insights.app_insights.connection_string
+  
+  sku_name                            = var.key_vault_sku
+  enable_purge_protection             = var.enable_purge_protection
+  soft_delete_retention_days          = var.soft_delete_retention_days
+
+  tags = {
+    environment = var.environment
+  }
+}
 ############################################
 # App Service Module
 ############################################
@@ -77,11 +100,12 @@ module "app_service" {
   
   app_insights_key               = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
-    # ✅ PASS TENANT ID FROM DATA SOURCE
-  tenant_id       = data.azurerm_client_config.current.tenant_id
+  tenant_id                      = data.azurerm_client_config.current.tenant_id
+  subscription_id                = data.azurerm_subscription.current.subscription_id
   
-  # ✅ PASS SUBSCRIPTION ID FROM DATA SOURCE
-  subscription_id = data.azurerm_subscription.current.subscription_id
+  # ✅ Pass Key Vault details (now available since it's defined above)
+  key_vault_name = module.key_vault.key_vault_name
+  key_vault_uri  = module.key_vault.key_vault_uri
   
   ip_restrictions = [
     {
@@ -92,6 +116,22 @@ module "app_service" {
   tags = {
     environment = var.environment
   }
+
+  depends_on = [module.key_vault]
+}
+
+############################################
+# Key Vault Access Policy for Web App
+############################################
+resource "azurerm_key_vault_access_policy" "webapp_access" {
+  key_vault_id       = module.key_vault.key_vault_id
+  tenant_id          = data.azurerm_client_config.current.tenant_id
+  object_id          = module.app_service.webapp_principal_id
+
+  secret_permissions = [
+    "Get",
+    "List"
+  ]
 }
 
 ############################################
