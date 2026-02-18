@@ -25,22 +25,21 @@ resource "azurerm_key_vault_access_policy" "webapp_access" {
   ]
 }
 
-# ✅ NEW - Grant Service Principal access to create/manage secrets
+# ✅ Grant Service Principal access to create/manage secrets
 resource "azurerm_key_vault_access_policy" "terraform_sp_access" {
   key_vault_id       = azurerm_key_vault.kv.id
   tenant_id          = var.tenant_id
-  object_id          = var.terraform_sp_object_id  # Service Principal Object ID
+  object_id          = var.terraform_sp_object_id
 
   secret_permissions = [
-    "Backup",
-    "Create",
-    "Delete",
     "Get",
     "List",
-    "Purge",
-    "Recover",
+    "Set",
+    "Delete",
+    "Backup",
     "Restore",
-    "Set"
+    "Recover",
+    "Purge"
   ]
 }
 
