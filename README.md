@@ -262,13 +262,13 @@ az ad sp create-for-rbac \
 
 Save the JSON output securely. It will be used in GitHub and Terraform Cloud.
 
-## Terraform Cloud Setup
+### Terraform Cloud Setup
 
-### Create an Organization
+#### Create an Organization
 - Sign in to [Terraform Cloud](https://app.terraform.io)
 - Create an organization (example: `AzureDevOpsDemo`)
 
-### Create Workspaces
+#### Create Workspaces
 Create two workspaces:
 
 | Workspace Name       |
@@ -278,9 +278,9 @@ Create two workspaces:
 
 Each workspace represents a separate environment.
 
-### Configure Variables
+#### Configure Variables
 
-#### Terraform Variables
+##### Terraform Variables
 | Key                  |
 |----------------------|
 | acr_name             |
@@ -294,7 +294,7 @@ Each workspace represents a separate environment.
 | sp_object_id         |
 | webapp_name          |
 
-#### Environment Variables
+##### Environment Variables
 | Key                  |
 |----------------------|
 | ARM_CLIENT_ID        | 
@@ -306,9 +306,9 @@ Mark all sensitive environment variables appropriately in Terraform Cloud.
 
 ---
 
-## GitHub Repository Setup
+### GitHub Repository Setup
 
-### GitHub Secrets
+#### GitHub Secrets
 Add the following secrets to your repository:
 
 | Secret Name         | Description                             |
@@ -318,7 +318,7 @@ Add the following secrets to your repository:
 
 ---
 
-### GitHub Environments
+#### GitHub Environments
 Create two environments in GitHub:
 | Environment | Requires Approval |
 |-------------|--------------------|
@@ -600,45 +600,6 @@ requests
 | render timechart
 ```
 
-#### **Error Rate Analysis**
-
-```kusto
-requests
-| where success == false
-| summarize ErrorCount = count() by bin(timestamp, 1h), resultCode
-| render barchart
-```
-
-#### **Response Time Percentiles**
-
-```kusto
-requests
-| summarize 
-    p50 = percentile(duration, 50),
-    p95 = percentile(duration, 95),
-    p99 = percentile(duration, 99)
-  by bin(timestamp, 5m)
-| render timechart
-```
-
-#### **Exception Analysis**
-
-```kusto
-exceptions
-| where timestamp > ago(24h)
-| summarize Count = count() by type, outerMessage
-| order by Count desc
-```
-
-#### **Custom Metrics**
-
-```kusto
-customMetrics
-| where name == "your_metric_name"
-| summarize avg(value) by bin(timestamp, 5m)
-| render timechart
-```
-
 ### **Monitoring Alerts**
 
 The following alerts are automatically configured:
@@ -695,44 +656,12 @@ az monitor app-insights query \
   --analytics-query "traces | where timestamp > ago(1h) | limit 100"
 ```
 
-### **Application Endpoints**
+### **Application Endpoint**
 
 | Endpoint | Method | Description | Response |
 |----------|--------|-------------|----------|
-| `/` | GET | Home page | JSON with app info |
 | `/health` | GET | Health check | Detailed health status |
-| `/info` | GET | App information | System and config details |
 
-#### **Health Endpoint Response**
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-02-11T10:30:00Z",
-  "environment": "dev",
-  "version": "latest",
-  "checks": {
-    "application": "ok",
-    "logging": "ok",
-    "app_insights": "enabled"
-  }
-}
-```
-
-#### **Info Endpoint Response**
-
-```json
-{
-  "application": "DevOps Demo App",
-  "environment": "dev",
-  "version": "latest",
-  "python_version": "3.10.x",
-  "monitoring": {
-    "application_insights": "enabled",
-    "logging_level": "INFO"
-  }
-}
-```
 
 ### **Testing Endpoints**
 
@@ -746,16 +675,6 @@ curl https://devops-demo-webapp-dev.azurewebsites.net/info
 # From specific IP (if behind proxy)
 curl -H "X-Forwarded-For: YOUR.IP.ADDRESS" https://...
 ```
-
-### **Performance Monitoring**
-
-Monitor these key metrics:
-
-- **Response Time:** < 500ms (target)
-- **Error Rate:** < 1% (target)
-- **Availability:** > 99.9% (target)
-- **CPU Usage:** < 70% (normal operation)
-- **Memory Usage:** < 70% (normal operation)
 
 ---
 
@@ -776,22 +695,6 @@ docker run -p 3000:3000 demo-app:test
 
 # Test endpoints
 curl http://localhost:3000/health
-curl http://localhost:3000/info
-curl http://localhost:3000/
-```
-
-#### **Test with Application Insights (Local)**
-
-```bash
-# Set environment variables
-export APPINSIGHTS_INSTRUMENTATIONKEY="your-key"
-export APPLICATIONINSIGHTS_CONNECTION_STRING="your-connection-string"
-
-# Run application
-python app.py
-
-# Generate traffic
-for i in {1..100}; do curl http://localhost:3000/health; done
 ```
 
 ### **Infrastructure Testing**
@@ -805,14 +708,8 @@ terraform init
 # Validate configuration
 terraform validate
 
-# Check formatting
-terraform fmt -check
-
 # Run plan
-terraform plan -var-file="environments/dev.tfvars"
-
-# Run security scan
-checkov -d . --quiet
+terraform plan
 ```
 
 ### **Integration Testing**
@@ -829,24 +726,10 @@ WEBAPP_URL=$(az webapp show \
 # Test health endpoint
 curl -f https://$WEBAPP_URL/health || echo "Health check failed"
 
-# Test response time
-curl -w "\nTime: %{time_total}s\n" https://$WEBAPP_URL/health
-
 # Test from unauthorized IP (should fail with 403)
 curl -v https://$WEBAPP_URL/health  # From non-whitelisted IP
 ```
 
-### **Load Testing**
-
-```bash
-# Using Apache Bench
-ab -n 1000 -c 10 https://$WEBAPP_URL/health
-
-# Using hey (modern alternative)
-hey -n 1000 -c 10 https://$WEBAPP_URL/health
-```
-
----
 
 ## 🔧 Troubleshooting
 
