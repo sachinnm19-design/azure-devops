@@ -8,8 +8,8 @@ A production-ready DevOps demonstration project showcasing Infrastructure as Cod
 
 - [Overview](#-overview)
 - [Architecture](#-architecture)
-- [Features](#-features)
 - [Project Structure](#-project-structure)
+- [Features](#-features)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
 - [Infrastructure](#-infrastructure)
@@ -19,10 +19,9 @@ A production-ready DevOps demonstration project showcasing Infrastructure as Cod
 - [Testing](#-testing)
 - [Troubleshooting](#-troubleshooting)
 - [Best Practices](#-best-practices)
-- [Future Enhancements](#-future-enhancements)
-- [Contributing](#-contributing)
-- [License](#-license)
-
+- [Acknowledgments](#-acknowledgments)
+- [Additional Resources](#-additional-resources)
+- [Project Status](#-project-status)
 ---
 
 ## 🎯 Overview
@@ -369,7 +368,7 @@ The Web App uses **System-Assigned Managed Identity** for:
 
 #### **Networking Module** (`modules/networking`)
 - Virtual Network (optional)
-- Subnets
+- Subnets (optional)
 - Network Security Groups
 - Security rules
 
@@ -384,14 +383,14 @@ terraform init
 # Validate
 terraform validate
 
-# Plan (dev)
-terraform plan -var-file="environments/dev.tfvars"
+# Plan
+terraform plan
 
-# Apply (dev)
-terraform apply -var-file="environments/dev.tfvars"
+# Apply
+terraform apply
 
-# Destroy (dev)
-terraform destroy -var-file="environments/dev.tfvars"
+# Destroy
+terraform destroy
 ```
 
 ---
@@ -443,7 +442,7 @@ terraform destroy -var-file="environments/dev.tfvars"
 - ✅ **Automated on push** to main branch
 - ✅ **PR validation** without deployment
 - ✅ **Security scanning** with Trivy and Checkov
-- ✅ **Terraform state locking** in Azure Storage
+- ✅ **Terraform state locking** in Terraform Cloud
 - ✅ **Environment-specific deployments**
 - ✅ **Manual approval** for production (optional)
 - ✅ **Rollback capability**
