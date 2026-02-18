@@ -6,22 +6,23 @@ A production-ready DevOps demonstration project showcasing Infrastructure as Cod
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Infrastructure](#infrastructure)
-- [CI/CD Pipeline](#cicd-pipeline)
-- [Security](#security)
-- [Monitoring & Observability](#monitoring--observability)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-- [Best Practices](#best-practices)
-- [Acknowledgments](#acknowledgments)
-- [Additional Resources](#additional-resources)
-- [Project Status](#project-status)
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Features](#-features)
+- [Project Structure](#-project-structure)
+- [Prerequisites](#-prerequisites)
+- [Quick Start](#-quick-start)
+- [Infrastructure](#-infrastructure)
+- [CI/CD Pipeline](#-cicd-pipeline)
+- [Security](#-security)
+- [Monitoring & Observability](#-monitoring--observability)
+- [Testing](#-testing)
+- [Troubleshooting](#-troubleshooting)
+- [Best Practices](#-best-practices)
+- [Acknowledgments](#-acknowledgments)
+- [Additional Resources](#-additional-resources)
+- [Project Status](#-project-status)
+
 ---
 
 ## 🎯 Overview
