@@ -65,13 +65,11 @@ module "acr" {
 module "key_vault" {
   source = "./modules/key_vault"
 
-  # ✅ Generate shorter name (max 24 chars total)
-  # Format: kv-<short_name>-<env>
   key_vault_name                      = "kv-${substr(var.webapp_name, 0, 12)}-${var.environment}"
   resource_group_name                 = azurerm_resource_group.rg.name
   location                            = var.location
   tenant_id                           = data.azurerm_client_config.current.tenant_id
-  webapp_principal_id                 = null
+  webapp_principal_id                 = ""  # ✅ Empty string instead of null (will be set via separate access policy)
   
   app_insights_instrumentation_key    = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string      = azurerm_application_insights.app_insights.connection_string
@@ -84,7 +82,6 @@ module "key_vault" {
     environment = var.environment
   }
 }
-
 ############################################
 # App Service Module
 ############################################
