@@ -6,22 +6,22 @@ A production-ready DevOps demonstration project showcasing Infrastructure as Cod
 
 ## 📋 Table of Contents
 
-- [Overview](#-overview)
-- [Architecture](#-architecture)
-- [Features](#-features)
-- [Project Structure](#-project-structure)
-- [Prerequisites](#-prerequisites)
-- [Quick Start](#-quick-start)
-- [Infrastructure](#-infrastructure)
-- [CI/CD Pipeline](#-cicd-pipeline)
-- [Security](#-security)
-- [Monitoring & Observability](#-monitoring--observability)
-- [Testing](#-testing)
-- [Troubleshooting](#-troubleshooting)
-- [Best Practices](#-best-practices)
-- [Acknowledgments](#-acknowledgments)
-- [Additional Resources](#-additional-resources)
-- [Project Status](#-project-status)
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Infrastructure](#infrastructure)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Security](#security)
+- [Monitoring & Observability](#monitoring--observability)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [Acknowledgments](#acknowledgments)
+- [Additional Resources](#additional-resources)
+- [Project Status](#project-status)
 ---
 
 ## 🎯 Overview
@@ -439,13 +439,14 @@ terraform destroy
 
 ### **Pipeline Features**
 
-- ✅ **Automated on push** to main branch
-- ✅ **PR validation** without deployment
-- ✅ **Security scanning** with Trivy and Checkov
-- ✅ **Terraform state locking** in Terraform Cloud
-- ✅ **Environment-specific deployments**
-- ✅ **Manual approval** for production (optional)
-- ✅ **Rollback capability**
+- ✅ **Automated deployment on push** to `main`
+- ✅ **Pull Request validation** (build + security + Terraform checks, no deployment)
+- ✅ **Container security scanning** using Trivy
+- ✅ **Remote Terraform state management** using Terraform Cloud
+- ✅ **Environment separation** via Terraform Cloud workspaces (`dev` / `prod`)
+- ✅ **Automatic DEV deployment**
+- ✅ **Manual approval for PROD deployment**
+- ✅ **Health endpoint verification after deployment**
 
 ### **Workflow Files**
 
