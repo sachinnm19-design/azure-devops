@@ -14,7 +14,7 @@ COPY app.py .
 EXPOSE 3000
 
 # Health check - simplified to match new endpoint
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD python -c "import requests; response = requests.get('http://localhost:3000/health'); assert response.json()['status'] == 'ok'" || exit 1
 
 # Use gunicorn for production
