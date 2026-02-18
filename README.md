@@ -43,7 +43,7 @@ This project demonstrates a complete DevOps workflow with:
 - **Container Registry:** Azure Container Registry (ACR)
 - **Compute:** Azure App Service (Linux Containers)
 - **Monitoring:** Application Insights + Log Analytics
-- **Security:** Azure Key Vault, Managed Identities
+- **Security:** Managed Identities
 - **CI/CD:** GitHub Actions
 - **Application:** Python Flask (containerized)
   
@@ -140,24 +140,21 @@ This project demonstrates a complete DevOps workflow with:
 
 ### **Infrastructure & Platform**
 
-- ✅ **Multi-environment support** (dev, staging, prod)
+- ✅ **Multi-environment support** (dev, prod)
 - ✅ **Modular Terraform code** for reusability
 - ✅ **Azure Container Registry** for image storage
 - ✅ **App Service with Linux containers**
-- ✅ **Virtual Network** integration ready
 - ✅ **Network Security Groups** for traffic control
 
 ### **Security**
 
 - ✅ **Managed Identity** for Azure resource access
-- ✅ **Azure Key Vault** for secrets management
+- ✅ **Azure Key Vault** for secrets management(optional)
 - ✅ **IP-based access restrictions** with default deny
 - ✅ **TLS 1.2+** enforcement
 - ✅ **HTTPS-only** traffic
-- ✅ **FTP disabled** for security
 - ✅ **Container vulnerability scanning** with Trivy
-- ✅ **Terraform security scanning** with Checkov
-- ✅ **SCM endpoint protection**
+- ✅ **Terraform security scanning** with Checkov(optonal)
 
 ### **CI/CD Pipeline**
 
@@ -165,7 +162,7 @@ This project demonstrates a complete DevOps workflow with:
 - ✅ **Multi-stage deployment** (build → test → deploy)
 - ✅ **Environment-specific configurations**
 - ✅ **Automated security scanning**
-- ✅ **Terraform state management** in Azure
+- ✅ **Terraform state management** in Terraform Cloud
 - ✅ **Pull request validation**
 - ✅ **Production approval gates**
 
@@ -175,7 +172,6 @@ This project demonstrates a complete DevOps workflow with:
 - ✅ **Log Analytics Workspace** for centralized logging
 - ✅ **Structured application logging**
 - ✅ **Health check endpoint** with auto-healing
-- ✅ **Automated alerts** for critical metrics
 - ✅ **Real-time log streaming**
 - ✅ **Request/response logging**
 
@@ -184,7 +180,6 @@ This project demonstrates a complete DevOps workflow with:
 - ✅ **Containerized Python Flask** application
 - ✅ **Production-ready** with Gunicorn
 - ✅ **Health check endpoint** (`/health`)
-- ✅ **Info endpoint** (`/info`)
 - ✅ **Docker health checks**
 - ✅ **Comprehensive error handling**
 
@@ -348,7 +343,7 @@ Create two environments in GitHub:
 
 The Web App uses **System-Assigned Managed Identity** for:
 - ✅ Pulling images from ACR (AcrPull role)
-- ✅ Accessing Key Vault secrets (Get, List permissions)
+- ✅ Accessing Key Vault secrets optional (Get, List permissions)
 - ✅ Secure, credential-free authentication
 
 ### **Infrastructure Modules**
@@ -357,7 +352,6 @@ The Web App uses **System-Assigned Managed Identity** for:
 - Container Registry provisioning
 - SKU selection (Basic/Standard/Premium)
 - Public/private access control
-- Admin user management
 
 #### **App Service Module** (`modules/app_service`)
 - App Service Plan creation
@@ -537,7 +531,6 @@ FROM python:3.10-slim
 - [x] TLS 1.2+ required
 - [x] IP restrictions enabled
 - [x] Default deny on unmatched traffic
-- [x] FTP disabled
 - [x] Managed Identity enabled
 - [x] Secrets in Key Vault
 - [x] Container scanning enabled
