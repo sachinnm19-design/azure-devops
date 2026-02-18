@@ -55,17 +55,6 @@ variable "ip_restrictions" {
   default     = []
   description = "List of IP addresses allowed to access the web app"
 }
-# Add these new variables:
-
-variable "key_vault_id" {
-  type        = string
-  description = "ID of the Key Vault for secret references"
-}
-
-variable "key_vault_uri" {
-  type        = string
-  description = "URI of the Key Vault for secret references"
-}
 
 # ✅ NEW - Key Vault Configuration Variables
 variable "enable_key_vault_protection" {
