@@ -77,6 +77,11 @@ module "app_service" {
   
   app_insights_key               = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
+    # ✅ PASS TENANT ID FROM DATA SOURCE
+  tenant_id       = data.azurerm_client_config.current.tenant_id
+  
+  # ✅ PASS SUBSCRIPTION ID FROM DATA SOURCE
+  subscription_id = data.azurerm_subscription.current.subscription_id
   
   ip_restrictions = [
     {
