@@ -90,3 +90,8 @@ variable "enable_purge_protection" {
   description = "Enable purge protection on Key Vault"
   default     = true
 }
+
+variable "key_vault_name" {
+  type        = string
+  description = "Name of the Key Vault (must be 3-24 alphanumeric characters, no consecutive hyphens)"
+}
