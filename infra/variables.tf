@@ -95,3 +95,9 @@ variable "key_vault_name" {
   type        = string
   description = "Name of the Key Vault (must be 3-24 alphanumeric characters, no consecutive hyphens)"
 }
+
+variable "terraform_sp_object_id" {
+  type        = string
+  description = "Object ID of the Service Principal used by Terraform for Key Vault access"
+  default     = ""
+}
