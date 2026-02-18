@@ -1,89 +1,207 @@
 # 🚀 Azure DevOps Demo - Complete CI/CD Pipeline
 
-A production-ready DevOps demonstration project showcasing Infrastructure as Code (IaC), CI/CD automation, security best practices, and application monitoring on Azure.
+A production-ready DevOps demonstration project showcasing Infrastructure as Code (IaC), CI/CD automation, security best practices, and comprehensive monitoring on Azure
 
 [![CI/CD Pipeline](https://github.com/sachinnm19-design/azure-devops/actions/workflows/deploy.yml/badge.svg)](https://github.com/sachinnm19-design/azure-devops/actions/workflows/deploy.yml)
 
 ## 📋 Table of Contents
 
-- [Introduction](#introduction)
-- [High-Level Architecture](#high-level-architecture)
-- [Repository Structure](#repository-structure)
-- [Application Details](#application-details)
-- [Prerequisites](#prerequisites)
-- [Azure Setup](#azure-setup)
-- [Terraform Cloud Setup](#terraform-cloud-setup)
-- [GitHub Repository Setup](#github-repository-setup)
-- [Infrastructure](#infrastructure)
-- [CI/CD Pipelines](#cicd-pipelines)
-- [Security](#security)
-- [Monitoring & Observability](#monitoring--observability)
-- [Testing](#testing)
-- [Best Practices](#best-practices)
-- [Verification](#verification)
-- [Future Enhancements](#future-enhancements)
-- [Contributing](#contributing)
-- [License](#license)
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Features](#-features)
+- [Project Structure](#-project-structure)
+- [Prerequisites](#-prerequisites)
+- [Quick Start](#-quick-start)
+- [Infrastructure](#-infrastructure)
+- [CI/CD Pipeline](#-cicd-pipeline)
+- [Security](#-security)
+- [Monitoring & Observability](#-monitoring--observability)
+- [Testing](#-testing)
+- [Troubleshooting](#-troubleshooting)
+- [Best Practices](#-best-practices)
+- [Future Enhancements](#-future-enhancements)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
-## Introduction
+## 🎯 Overview
 
-This repository demonstrates a complete, production-oriented DevOps workflow using:
+This project demonstrates a complete DevOps workflow with:
 
-- **Terraform** for Infrastructure as Code (IaC)
-- **Terraform Cloud** for remote state management and environment isolation
-- **Azure** for hosting a containerized application
-- **GitHub Actions** for CI/CD automation with PR-based workflow
-- **Azure Container Registry (ACR)** for secure container image storage
-- **Application Insights & Log Analytics** for comprehensive monitoring
-- **Role-Based Access Control (RBAC)** for secure resource access
+- **Infrastructure as Code** using Terraform
+- **Containerized Application** with Docker
+- **Multi-Environment Deployment** (Dev/Prod)
+- **Automated CI/CD** with GitHub Actions
+- **Security Scanning** and vulnerability detection
+- **Monitoring & Alerting** with Application Insights
+- **Network Security** with IP restrictions and TLS enforcement
 
-The solution provisions Azure infrastructure, builds a containerized application, and deploys it safely across DEV and PROD environments with automated security scanning and validation.
-
-### Key Technologies
+### **Key Technologies**
 
 - **Cloud Platform:** Microsoft Azure
-- **IaC Tool:** Terraform (with Terraform Cloud state management)
-- **Container Registry:** Azure Container Registry (ACR) - Public Access
+- **IaC Tool:** Terraform
+- **Container Registry:** Azure Container Registry (ACR)
 - **Compute:** Azure App Service (Linux Containers)
 - **Monitoring:** Application Insights + Log Analytics
+- **Security:** Azure Key Vault, Managed Identities
 - **CI/CD:** GitHub Actions
-- **Application:** Python Flask with Gunicorn (Production-Ready)
+- **Application:** Python Flask (containerized)
 
 ---
 
-## High-Level Architecture
+┌─────────────────────────────────────────────────────────────────┐
+│                         GitHub Repository                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │ Application  │  │     IaC      │  │   GitHub Actions     │  │
+│  │  Code (Flask)│  │  (Terraform) │  │   (CI/CD Pipeline)   │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                    Triggers on Push/PR
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    GitHub Actions Workflow                       │
+│  ┌───────────┐  ┌���─────────────┐  ┌────────────┐  ┌─────────┐ │
+│  │   Build   │→ │Security Scan │→ │  Terraform │→ │ Deploy  │ │
+│  │  & Test   │  │   (Trivy)    │  │   Apply    │  │  to App │ │
+│  └───────────┘  └──────────────┘  └────────────┘  └─────────┘ │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Azure Cloud Platform                        │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │                    Resource Group                         │  │
+│  │                                                            │  │
+│  │  ┌────────────────────┐      ┌────────────────────────┐  │  │
+│  │  │  Container Registry│      │   App Service Plan     │  │  │
+│  │  │      (ACR)         │      │     (Linux)            │  │  │
+│  │  │   PUBLIC ACCESS    │      │  ┌──────────────────┐  │  │  │
+│  │  │  ┌──────────────┐  │      │  │   Web App        │  │  │  │
+│  │  │  │Docker Images │  │      │  │  (Container)     │  │  │  │
+│  │  │  │  - Flask App │  │─────▶│  │  (Gunicorn)      │  │  │  │
+│  │  │  └──────────────┘  │      │  └──────────────────┘  │  │  │
+│  │  │                    │      │  ┌──────────────────┐  │  │  │
+│  │  │  (No Key Vault)    │      │  │  Managed Identity│  │  │  │
+│  │  │                    │      │  │  (AcrPull Role) │  │  │  │
+│  │  └────────────────────┘      └──────────────────────┘  │  │
+│  │                                                            │  │
+│  │  ┌────────────────────┐      ┌────────────────────────┐  │  │
+│  │  │ Application        │      │  Application Insights  │  │  │
+│  │  │ Insights           │      │  - Request Tracking    │  │  │
+│  │  │ - Monitoring       │      │  - Exception Logging   │  │  │
+│  │  │ - Live Metrics     │      │  - No Metrics/Perf     │  │  │
+│  │  └────────────────────┘      └────────────────────────┘  │  │
+│  │                                                            │  │
+│  │  ┌────────────────────┐      ┌────────────────────────┐  │  │
+│  │  │ Log Analytics      │      │  Networking            │  │  │
+│  │  │  - Centralized Logs│      │  - IP Restrictions     │  │  │
+│  │  │  - 30-day Retention│      │  - Default Deny        │  │  │
+│  │  └────────────────────┘      └────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
 
-For detailed visual representations of the architecture, see the diagrams in the `images/` folder:
-- **Azure Cloud Architecture.jpg**: Azure infrastructure and resource relationships
-- **CI CD Architecture.jpg**: Complete CI/CD pipeline flow
+### **Network Security**
 
-### Azure Resources Provisioned
-
-- Resource Group
-- Azure Container Registry (ACR)
-- App Service Plan (Linux)
-- Azure Web App for Containers
-- Application Insights
-- Log Analytics Workspace
-
-### CI/CD Flow
-
-1. Developer creates a feature branch and raises a Pull Request
-2. CI pipeline runs Terraform plan (DEV workspace) and Docker build validation
-3. Pull Request is reviewed and approved
-4. Merge to `main` triggers CD pipeline
-5. DEV deployment happens automatically
-6. PROD deployment requires manual approval
-
-Terraform state and environment separation are handled using **Terraform Cloud workspaces**.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Internet                                 │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                   ┌─────────▼──────────┐
+                   │  Azure Front Door  │
+                   │    (Optional)      │
+                   └─────────┬──────────┘
+                             │
+                   ┌─────────▼──────────┐
+                   │   HTTPS (TLS 1.2)  │
+                   └─────────┬──────────┘
+                             │
+                   ┌─────────▼──────────┐
+                   │  IP Restrictions   │
+                   │  (Whitelist Only)  │
+                   └─────────┬──────────┘
+                             │
+                   ┌─────────▼──────────┐
+                   │    Azure Web App   │
+                   │   (Flask in Docker)│
+                   └─────────┬──────────┘
+                             │
+                   ┌─────────▼──────────┐
+                   │  Managed Identity  │
+                   │   ACR Pull Access  │
+                   └────────────────────┘
+```
 
 ---
 
-## Repository Structure
+## ✨ Features
 
+### **Infrastructure & Platform**
+
+- ✅ **Multi-environment support** (dev, staging, prod)
+- ✅ **Modular Terraform code** for reusability
+- ✅ **Azure Container Registry** for image storage
+- ✅ **App Service with Linux containers**
+- ✅ **Virtual Network** integration ready
+- ✅ **Network Security Groups** for traffic control
+
+### **Security**
+
+- ✅ **Managed Identity** for Azure resource access
+- ✅ **Azure Key Vault** for secrets management
+- ✅ **IP-based access restrictions** with default deny
+- ✅ **TLS 1.2+** enforcement
+- ✅ **HTTPS-only** traffic
+- ✅ **FTP disabled** for security
+- ✅ **Container vulnerability scanning** with Trivy
+- ✅ **Terraform security scanning** with Checkov
+- ✅ **SCM endpoint protection**
+
+### **CI/CD Pipeline**
+
+- ✅ **Automated builds** on every commit
+- ✅ **Multi-stage deployment** (build → test → deploy)
+- ✅ **Environment-specific configurations**
+- ✅ **Automated security scanning**
+- ✅ **Terraform state management** in Azure
+- ✅ **Pull request validation**
+- ✅ **Production approval gates**
+
+### **Observability & Monitoring**
+
+- ✅ **Application Insights** integration
+- ✅ **Log Analytics Workspace** for centralized logging
+- ✅ **Structured application logging**
+- ✅ **Health check endpoint** with auto-healing
+- ✅ **Performance metrics** (CPU, memory, response time)
+- ✅ **Automated alerts** for critical metrics
+- ✅ **Real-time log streaming**
+- ✅ **Exception tracking** with stack traces
+- ✅ **Request/response logging**
+
+### **Application**
+
+- ✅ **Containerized Python Flask** application
+- ✅ **Production-ready** with Gunicorn
+- ✅ **Health check endpoint** (`/health`)
+- ✅ **Info endpoint** (`/info`)
+- ✅ **Docker health checks**
+- ✅ **Comprehensive error handling**
+
+---
+
+## 📁 Project Structure
+
+```
 .
+├── .github/
+│   └── workflows/
+│       └── deploy.yml              # CI/CD pipeline definition
+│
 ├── app/
 │   ├── app.py                      # Flask application with logging
 │   ├── requirements.txt            # Python dependencies
@@ -94,8 +212,9 @@ Terraform state and environment separation are handled using **Terraform Cloud w
 │   ├── provider.tf                 # Azure provider configuration
 │   ├── variables.tf                # Input variables
 │   ├── outputs.tf                  # Output values
-│   └── datasources.tf              # Data sources
-│
+│   ├── datasources.tf              # Data sources
+│   ├── monitoring.tf               # Monitoring alerts
+│   │
 │   ├── modules/
 │   │   ├── acr/                    # Container Registry module
 │   │   │   ├── main.tf
@@ -111,741 +230,1252 @@ Terraform state and environment separation are handled using **Terraform Cloud w
 │   │       ├── main.tf
 │   │       ├── variables.tf
 │   │       └── outputs.tf
-│
+│   │
 │   └── environments/
 │       ├── dev.tfvars              # Dev environment variables
 │       └── prod.tfvars             # Prod environment variables
 │
-├── images/
-│   ├── Azure Cloud Architecture.jpg
-│   └── CI CD Architecture.jpg
-│
-├── .github/
-│   └── workflows/
-│       ├── pr-validation.yml       # PR validation pipeline
-│       └── deploy.yml              # Deployment pipeline
-│
 ├── README.md                       # This file
 └── .gitignore                      # Git ignore rules
+```
 
 ---
 
-## Application Details
+## 🔧 Prerequisites
 
-### Overview
-- Simple containerized application using **Flask** (Python)
-- Production-ready with **Gunicorn** WSGI server
-- Exposes a **health endpoint** for monitoring and load balancer checks
+### **Required Tools**
 
-### Health Endpoint
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Azure CLI | 2.50+ | Azure resource management |
+| Terraform | 1.5+ | Infrastructure provisioning |
+| Docker | 20.10+ | Container builds and testing |
+| Git | 2.30+ | Version control |
+| GitHub Account | - | Code hosting and CI/CD |
 
-GET /health
-Response: { "status": "ok" }
-
-### Technical Specifications
-
-- **Language:** Python 3.10
-- **Framework:** Flask
-- **Server:** Gunicorn (production-grade WSGI server)
-- **Port:** 3000
-- **Base Image:** python:3.10-slim (minimal, security-focused)
-- **Health Checks:** Docker health checks enabled
-- **Logging:** Structured logging with JSON output to Application Insights
-
----
-
-## Prerequisites
-
-### Required Tools
-
-Tool | Version | Purpose
-Azure CLI | 2.40+ | Azure resource management
-Terraform | 1.3+ | Infrastructure provisioning
-Docker | 20.10+ | Container builds and testing
-Git | 2.30+ | Version control
-GitHub Account | - | Code hosting and CI/CD
-
-### Azure Requirements
+### **Azure Requirements**
 
 - Active Azure subscription
 - Contributor or Owner role on subscription
-- Resource quotas for App Service Plans, Container Registries, Application Insights, Log Analytics Workspaces
-
-### Terraform Cloud Requirements
-
-- Terraform Cloud account (free tier available at https://app.terraform.io)
-- API token for CI/CD authentication
-- Workspaces configured in Terraform Cloud
-
-### GitHub Requirements
-
-- GitHub account with admin access to create secrets and environments
-- Repository created and cloned locally
+- Service Principal for Terraform
+- Resource quotas for:
+  - App Service Plans
+  - Container Registries
+  - Key Vaults
+  - Log Analytics Workspaces
 
 ---
 
-## Azure Setup
+## 🚀 Quick Start
 
-### Create a Service Principal
+### **1. Clone the Repository**
 
-Create a Service Principal with Contributor access for Terraform and GitHub Actions:
+```bash
+git clone https://github.com/sachinnm19-design/azure-devops.git
+cd azure-devops
+```
 
+### **2. Set Up Azure Service Principal**
+
+```bash
+# Login to Azure
+az login
+
+# Set subscription
+az account set --subscription "<your-subscription-id>"
+
+# Create Service Principal
 az ad sp create-for-rbac \
-  --name devops-demo-sp \
+  --name "terraform-sp" \
   --role Contributor \
-  --scopes /subscriptions/<SUBSCRIPTION_ID> \
-  --sdk-auth
+  --scopes /subscriptions/<subscription-id>
 
-Save the JSON output securely. It will be used in both GitHub Secrets and Terraform Cloud Environment Variables.
+# Output (save these values):
+# {
+#   "appId": "xxxx",           # ARM_CLIENT_ID
+#   "password": "xxxx",        # ARM_CLIENT_SECRET
+#   "tenant": "xxxx"           # ARM_TENANT_ID
+# }
+```
 
-Example output format:
+### **3. Configure GitHub Secrets**
 
-{
-  "clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "clientSecret": "your-secret",
-  "subscriptionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-}
+Add the following secrets to your GitHub repository:
 
----
+```
+Settings → Secrets and variables → Actions → New repository secret
+```
 
-## Terraform Cloud Setup
+| Secret Name | Value | Description |
+|-------------|-------|-------------|
+| `AZURE_CLIENT_ID` | Service Principal App ID | Terraform authentication |
+| `AZURE_CLIENT_SECRET` | Service Principal Password | Terraform authentication |
+| `AZURE_SUBSCRIPTION_ID` | Your subscription ID | Target Azure subscription |
+| `AZURE_TENANT_ID` | Your tenant ID | Azure AD tenant |
+| `ARM_CLIENT_ID` | Same as AZURE_CLIENT_ID | Terraform provider auth |
+| `ARM_CLIENT_SECRET` | Same as AZURE_CLIENT_SECRET | Terraform provider auth |
+| `ARM_SUBSCRIPTION_ID` | Same as AZURE_SUBSCRIPTION_ID | Terraform provider auth |
+| `ARM_TENANT_ID` | Same as AZURE_TENANT_ID | Terraform provider auth |
 
-### Step 1: Create an Organization
+### **4. Create Storage Account for Terraform State**
 
-1. Sign in to https://app.terraform.io
-2. Create an organization (example: AzureDevOpsDemo)
-3. Create an API token in your user settings:
-   - Navigate to User Settings → Tokens
-   - Create a new token and save it securely
+```bash
+# Create resource group
+az group create \
+  --name terraform-state-rg \
+  --location eastus
 
-### Step 2: Create Workspaces
+# Create storage account
+az storage account create \
+  --name tfstatedevops$(date +%s) \
+  --resource-group terraform-state-rg \
+  --location eastus \
+  --sku Standard_LRS
 
-Create two workspaces for environment isolation:
+# Create container
+az storage container create \
+  --name tfstate \
+  --account-name <storage-account-name>
 
-Workspace Name | Purpose
-devops-demo-dev | Development environment
-devops-demo-prod | Production environment
+# Get storage account key
+az storage account keys list \
+  --resource-group terraform-state-rg \
+  --account-name <storage-account-name> \
+  --query "[0].value" -o tsv
+```
 
-Each workspace maintains its own state file and variable values.
+Add these to GitHub secrets:
+- `TF_STATE_STORAGE_ACCOUNT`: Storage account name
+- `TF_STATE_STORAGE_KEY`: Storage account key
 
-### Step 3: Configure Terraform Variables
+### **5. Update Configuration Files**
 
-#### Terraform Variables (Per Workspace)
+**Update `infra/provider.tf`:**
 
-Variable Name | Type | Description
-acr_name | string | Name for Azure Container Registry
-app_service_plan_name | string | Name for App Service Plan
-environment | string | Environment name (dev/prod)
-image_name | string | Docker image name
-image_tag | string | Docker image tag
-location | string | Azure region (e.g., eastus)
-resource_group_name | string | Azure Resource Group name
-sku_name | string | App Service Plan SKU (B1 for dev, P1V2 for prod)
-webapp_name | string | Azure Web App name
-
-#### Environment Variables (Sensitive - Mark as Sensitive)
-
-Variable Name | Source | Description
-ARM_CLIENT_ID | Service Principal | Azure Client ID
-ARM_CLIENT_SECRET | Service Principal | Azure Client Secret
-ARM_SUBSCRIPTION_ID | Service Principal | Azure Subscription ID
-ARM_TENANT_ID | Service Principal | Azure Tenant ID
-
-Important: Mark all ARM_* variables as Sensitive in Terraform Cloud to prevent them from being displayed in logs.
-
----
-
-## GitHub Repository Setup
-
-### Step 1: Configure GitHub Secrets
-
-Add the following secrets to your repository (Settings → Secrets and variables → Actions):
-
-Secret Name | Value | Description
-AZURE_CREDENTIALS | Service Principal JSON | For Azure CLI authentication in workflows
-TF_API_TOKEN | Terraform Cloud API Token | For Terraform Cloud authentication
-
-Azure Credentials Format:
-
-{
-  "clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "clientSecret": "your-secret",
-  "subscriptionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-}
-
-### Step 2: Create GitHub Environments
-
-Create two environments for deployment gates:
-
-Environment | Requires Approval | Branch Protection
-dev | No | main
-prod | Yes | main
-
-To create environments:
-1. Go to Settings → Environments
-2. Click New environment
-3. For prod: Enable Required reviewers under Deployment branches
-
----
-
-## Infrastructure
-
-### Core Resources Provisioned
-
-Resource | Purpose | Configuration
-Resource Group | Logical container for all resources | Per environment
-Azure Container Registry | Container image storage and management | Public access for GitHub Actions
-App Service Plan | Compute capacity for Web App | B1 (dev), P1V2 (prod)
-Web App for Containers | Containerized application hosting | Linux, with Managed Identity
-Application Insights | Application monitoring and diagnostics | Web application type
-Log Analytics Workspace | Centralized logging and analytics | PerGB2018 pricing, 30-day retention
-
-### Managed Identity
-
-The Web App uses System-Assigned Managed Identity for:
-- Pulling images from ACR (AcrPull role)
-- Secure, credential-free authentication
-- Role-Based Access Control to Azure resources
-
-### Infrastructure Modules
-
-#### ACR Module (modules/acr)
-
-- Container Registry provisioning with configurable SKU
-- Public access enabled for GitHub Actions CI/CD to pull images
-- Managed Identity integration for Web App
-
-Note on ACR Access: ACR is configured with public access to allow GitHub Actions CI/CD pipeline to pull container images. To make ACR private while maintaining CI/CD functionality:
-- Implement private endpoints in your VNet
-- Use Managed Identity with proper RBAC roles
-- Restrict ACR access via network rules
-- Use a self-hosted GitHub Actions runner in the VNet
-
-#### App Service Module (modules/app_service)
-
-- App Service Plan creation with environment-specific SKUs
-- Web App configuration with Managed Identity
-- Container settings and image pull configuration
-- Application Insights integration
-- IP restrictions (for production security)
-- Health check configuration
-- Docker health checks
-
-#### Networking Module (modules/networking)
-
-- Network Security Groups (NSG) creation
-- Security rules for traffic control
-- Optional NSG creation per environment
-
-### Terraform Configuration Examples
-
-Update infra/provider.tf:
-
+```hcl
 terraform {
-  cloud {
-    organization = "your-organization"
-    
-    workspaces {
-      name = "devops-demo-dev"
-    }
-  }
-  
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
-    }
+  backend "azurerm" {
+    resource_group_name  = "terraform-state-rg"
+    storage_account_name = "<your-storage-account-name>"
+    container_name       = "tfstate"
+    key                  = "terraform.tfstate"
   }
 }
+```
 
-provider "azurerm" {
-  features {}
-}
+**Update IP restrictions in `infra/main.tf`:**
 
-Terraform Commands:
+```hcl
+ip_restrictions = [
+  {
+    ip_address = "YOUR.IP.ADDRESS.HERE"  # Replace with your IP
+  }
+]
+```
 
+### **6. Deploy**
+
+```bash
+# Create feature branch
+git checkout -b feature/initial-setup
+
+# Commit changes
+git add .
+git commit -m "Initial setup with custom configuration"
+git push origin feature/initial-setup
+
+# Create Pull Request on GitHub
+# Merge to main branch
+```
+
+The CI/CD pipeline will automatically:
+1. ✅ Build the Docker image
+2. ✅ Run security scans
+3. ✅ Deploy infrastructure
+4. ✅ Deploy application
+
+### **7. Verify Deployment**
+
+```bash
+# Get the Web App URL
+az webapp show \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev \
+  --query defaultHostName -o tsv
+
+# Test the application
+curl https://<webapp-url>/health
+curl https://<webapp-url>/info
+```
+
+---
+
+## 🏗️ Infrastructure
+
+### **Core Resources**
+
+| Resource | Purpose | Configuration |
+|----------|---------|---------------|
+| Resource Group | Logical container | Per environment |
+| App Service Plan | Compute capacity | B1 (dev), P1V2 (prod) |
+| Web App | Application hosting | Linux container |
+| Container Registry | Image storage | Basic SKU (dev), Premium (prod) |
+| Key Vault | Secrets management | Standard SKU |
+| Application Insights | Monitoring | Web application type |
+| Log Analytics | Centralized logging | PerGB2018 pricing |
+| Network Security Group | Network security | Port 443 allowed |
+
+### **Managed Identity**
+
+The Web App uses **System-Assigned Managed Identity** for:
+- ✅ Pulling images from ACR (AcrPull role)
+- ✅ Accessing Key Vault secrets (Get, List permissions)
+- ✅ Secure, credential-free authentication
+
+### **Infrastructure Modules**
+
+#### **ACR Module** (`modules/acr`)
+- Container Registry provisioning
+- SKU selection (Basic/Standard/Premium)
+- Public/private access control
+- Admin user management
+
+#### **App Service Module** (`modules/app_service`)
+- App Service Plan creation
+- Web App configuration
+- Container settings
+- Application Insights integration
+- IP restrictions
+- Health check configuration
+- Logging configuration
+
+#### **Networking Module** (`modules/networking`)
+- Virtual Network (optional)
+- Subnets
+- Network Security Groups
+- Security rules
+
+### **Terraform Commands**
+
+```bash
 cd infra
 
+# Initialize
 terraform init
 
+# Validate
 terraform validate
 
-terraform plan
+# Plan (dev)
+terraform plan -var-file="environments/dev.tfvars"
 
-terraform apply
+# Apply (dev)
+terraform apply -var-file="environments/dev.tfvars"
 
-terraform destroy
-
----
-
-## CI/CD Pipelines
-
-### Pipeline Overview
-
-The CI/CD system uses two separate workflows:
-
-1. PR Validation Pipeline (pr-validation.yml) - Runs on Pull Requests
-2. Deployment Pipeline (deploy.yml) - Runs on merges to main
-
-### CI – PR Validation Pipeline
-
-Runs automatically on Pull Requests targeting the main branch.
-
-Pipeline Steps:
-
-1. Terraform Plan for DEV
-   - Initializes Terraform with DEV workspace
-   - Validates infrastructure configuration
-   - Generates plan output for review
-
-2. Docker Build Validation
-   - Builds Docker image to ensure no build errors
-   - Validates Dockerfile syntax and dependencies
-   - Runs container security scans with Trivy
-
-3. Terraform Security Scan
-   - Runs Checkov for IaC security validation
-   - Checks for misconfigurations and best practice violations
-
-### CD – Deployment Pipeline
-
-Triggered automatically on merges to the main branch.
-
-DEV Deployment Steps:
-
-1. Checkout Code
-2. Setup Azure CLI
-3. Terraform Plan (DEV)
-4. Terraform Apply (DEV)
-5. Build Docker Image
-6. Push to ACR
-7. Deploy to DEV Web App
-
-PROD Deployment Steps:
-
-1. Wait for Approval
-2. Terraform Plan (PROD)
-3. Terraform Apply (PROD)
-4. Build Docker Image
-5. Push to ACR
-6. Deploy to PROD Web App
-
-### Workflow Files
-
-Located in .github/workflows/
-
-Key Workflow Features:
-
-- Environment-specific secrets and variables
-- Conditional steps based on branch and environment
-- Approval gates for production deployments
-- Terraform state management via Terraform Cloud
-- Security scanning at every step
-- Detailed logging and artifact retention
+# Destroy (dev)
+terraform destroy -var-file="environments/dev.tfvars"
+```
 
 ---
 
-## Security
+## 🔄 CI/CD Pipeline
 
-### Network Security
+### **Workflow Stages**
 
-#### IP Restrictions
+```
+┌─────────────┐
+│   Trigger   │ Push to main or PR
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   Checkout  │ Clone repository
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    Build    │ Build Docker image
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   Security  │ Trivy + Checkov scans
+│   Scanning  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  Terraform  │ Init → Plan → Apply
+│   Deploy    │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Push Image  │ Push to ACR
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Deploy App  │ Restart Web App
+└─────────────┘
+```
+
+### **Pipeline Features**
+
+- ✅ **Automated on push** to main branch
+- ✅ **PR validation** without deployment
+- ✅ **Security scanning** with Trivy and Checkov
+- ✅ **Terraform state locking** in Azure Storage
+- ✅ **Environment-specific deployments**
+- ✅ **Manual approval** for production (optional)
+- ✅ **Rollback capability**
+
+### **Workflow File**
+
+Located at `.github/workflows/deploy.yml`
+
+Key steps:
+1. **Checkout code**
+2. **Setup Azure CLI**
+3. **Build Docker image**
+4. **Security scanning**
+5. **Terraform init/plan/apply**
+6. **Push image to ACR**
+7. **Restart Web App**
+
+### **Environment Variables**
+
+Set in GitHub Actions workflow:
+
+```yaml
+env:
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  RESOURCE_GROUP: devops-demo-rg-${{ github.ref == 'refs/heads/main' && 'dev' || 'dev' }}
+  WEBAPP_NAME: devops-demo-webapp-${{ github.ref == 'refs/heads/main' && 'dev' || 'dev' }}
+  ACR_NAME: devopsdemoregistry
+```
+
+---
+
+## 🔒 Security
+
+### **Network Security**
+
+#### **IP Restrictions**
 
 Web App is protected by IP whitelist:
 
+```hcl
 ip_restrictions = [
   {
-    ip_address = "YOUR.IP.ADDRESS.HERE"
+    ip_address = "2.223.114.28"
   }
 ]
 
-ip_restriction_default_action = "Deny"
+ip_restriction_default_action = "Deny"  # Block all other IPs
+```
 
-#### SCM (Deployment) Protection
+#### **SCM (Deployment) Protection**
 
 Deployment endpoints are also protected:
 
+```hcl
 scm_ip_restriction_default_action = "Deny"
+```
 
-#### TLS/SSL Configuration
+#### **TLS/SSL Configuration**
 
+```hcl
 https_only          = true
-minimum_tls_version = "1.2"
+minimum_tls_version = "1.2"  # Can be upgraded to 1.3
 ftps_state          = "Disabled"
+```
 
-### Container Security
+### **Container Security**
 
-#### Vulnerability Scanning
+#### **Vulnerability Scanning**
 
 Automated scanning with Trivy:
 
+```bash
 trivy image \
   --severity HIGH,CRITICAL \
   --exit-code 1 \
   myimage:tag
+```
 
-#### Base Image Best Practices
+#### **Base Image Best Practices**
 
+```dockerfile
+# Use official, minimal base images
 FROM python:3.10-slim
 
-### Infrastructure Security
+# Run as non-root user (optional)
+# RUN useradd -m appuser
+# USER appuser
+```
 
-#### Terraform Security Scanning
+### **Infrastructure Security**
+
+#### **Terraform Security Scanning**
 
 Automated with Checkov:
 
+```bash
 checkov -d infra/ \
   --quiet \
   --compact \
   --skip-check CKV_AZURE_*
+```
 
-#### Secrets Management
+#### **Secrets Management**
 
-- No secrets stored in code or configuration files
-- Managed Identity for Azure resource access
-- GitHub Secrets for CI/CD credentials (only 2: AZURE_CREDENTIALS, TF_API_TOKEN)
-- Terraform Cloud workspace variables for sensitive configuration
-- All sensitive variables marked as Sensitive in Terraform Cloud
+- ✅ All secrets in Azure Key Vault
+- ✅ No secrets in code or environment files
+- ✅ Managed Identity for authentication
+- ✅ GitHub Secrets for CI/CD credentials
 
-### Access Control
+### **Access Control**
 
-Access to Azure resources uses Role-Based Access Control (RBAC):
+| Resource | Access Method | Permissions |
+|----------|---------------|-------------|
+| ACR | Managed Identity | AcrPull |
+| Key Vault | Managed Identity | Get, List secrets |
+| Azure Resources | Service Principal | Contributor |
+| GitHub Actions | Secrets | Read-only |
 
-Resource | Principal | Role
-ACR | Web App Managed Identity | AcrPull
-Azure Resources | Service Principal (GitHub Actions) | Contributor
-Terraform Cloud | GitHub Actions | API Token Authentication
+### **Security Checklist**
 
-### Security Checklist
-
-[x] HTTPS enforced
-[x] TLS 1.2+ required
-[x] IP restrictions enabled
-[x] Default deny on unmatched traffic
-[x] FTP disabled
-[x] Managed Identity enabled
-[x] Container scanning enabled
-[x] IaC security scanning enabled
-[x] Minimal base images
-[x] No sensitive data in code
-[x] RBAC-based access control
-[x] Workspace-level environment isolation
+- [x] HTTPS enforced
+- [x] TLS 1.2+ required
+- [x] IP restrictions enabled
+- [x] Default deny on unmatched traffic
+- [x] FTP disabled
+- [x] Managed Identity enabled
+- [x] Secrets in Key Vault
+- [x] Container scanning enabled
+- [x] IaC security scanning enabled
+- [x] Minimal base images
+- [x] No admin credentials stored
 
 ---
 
-## Monitoring & Observability
+## 📊 Monitoring & Observability
 
-### Application Insights
+### **Application Insights**
 
 Application Insights is automatically configured and provides:
-- Request tracking and exception logging
-- Dependency tracking (external calls)
-- Live metrics stream
-- Structured application logging
-- Performance counters
+- ✅ Request tracking and performance metrics
+- ✅ Exception tracking and error logging
+- ✅ Dependency tracking (external calls)
+- ✅ Custom metrics and events
+- ✅ Live metrics stream
+- ✅ Distributed tracing
 
-Access Application Insights:
+**Access Application Insights:**
 
+```bash
+# Via Azure Portal
 az monitor app-insights component show \
   --app devops-demo-webapp-dev-insights \
   --resource-group devops-demo-rg-dev
 
-### Log Analytics Workspace
+# View live metrics
+# Navigate to: Azure Portal → Application Insights → Live Metrics
+```
+
+### **Log Analytics Workspace**
 
 Centralized logging with:
 - 30-day retention
 - Advanced query capabilities (KQL)
 - Cross-resource queries
-- Alert rules for proactive monitoring
+- Alert integration
 
-### Log Analytics Queries
+### **Log Analytics Queries**
 
-#### View Application Logs
+#### **View Application Logs**
 
+```kusto
 traces
 | where timestamp > ago(1h)
 | project timestamp, message, severityLevel
 | order by timestamp desc
+```
 
-#### Health Check Monitoring
+#### **Health Check Monitoring**
 
+```kusto
 requests
 | where name == "GET /health"
 | summarize 
     SuccessRate = avg(success)*100, 
-    Count = count()
+    Count = count(),
+    AvgDuration = avg(duration)
   by bin(timestamp, 5m)
 | render timechart
+```
 
-#### Error Analysis
+#### **Error Rate Analysis**
 
+```kusto
 requests
 | where success == false
 | summarize ErrorCount = count() by bin(timestamp, 1h), resultCode
 | render barchart
+```
 
-#### Exception Analysis
+#### **Response Time Percentiles**
 
+```kusto
+requests
+| summarize 
+    p50 = percentile(duration, 50),
+    p95 = percentile(duration, 95),
+    p99 = percentile(duration, 99)
+  by bin(timestamp, 5m)
+| render timechart
+```
+
+#### **Exception Analysis**
+
+```kusto
 exceptions
 | where timestamp > ago(24h)
 | summarize Count = count() by type, outerMessage
 | order by Count desc
+```
 
-### Application Endpoints
+#### **Custom Metrics**
 
-Endpoint | Method | Description | Response
-/health | GET | Health check with application status | {"status": "ok"}
+```kusto
+customMetrics
+| where name == "your_metric_name"
+| summarize avg(value) by bin(timestamp, 5m)
+| render timechart
+```
 
-Testing Endpoint:
+### **Monitoring Alerts**
 
-curl https://devops-demo-webapp-dev.azurewebsites.net/health
-curl https://devops-demo-webapp-prod.azurewebsites.net/health
+The following alerts are automatically configured:
 
-### Viewing Logs
+| Alert | Threshold | Severity | Enabled |
+|-------|-----------|----------|---------|
+| High Error Rate | > 5% | Warning | Prod only |
+| Slow Response Time | > 2000ms | Warning | Prod only |
+| Health Check Failed | < 100 | Critical | Prod only |
+| High CPU Usage | > 80% | Warning | Prod only |
+| High Memory Usage | > 80% | Warning | Prod only |
 
-#### Real-time Log Streaming
+**View Alerts:**
 
+```bash
+az monitor metrics alert list \
+  --resource-group devops-demo-rg-dev
+```
+
+### **Viewing Logs**
+
+#### **Real-time Log Streaming**
+
+```bash
+# Stream application logs
 az webapp log tail \
   --name devops-demo-webapp-dev \
   --resource-group devops-demo-rg-dev
 
-#### Query Logs via CLI
+# Stream with filter
+az webapp log tail \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev \
+  --filter Error
+```
 
+#### **Download Logs**
+
+```bash
+# Download all logs
+az webapp log download \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev \
+  --log-file logs.zip
+```
+
+#### **Query Logs via CLI**
+
+```bash
+# Query Application Insights logs
 az monitor app-insights query \
   --app devops-demo-webapp-dev-insights \
   --resource-group devops-demo-rg-dev \
   --analytics-query "traces | where timestamp > ago(1h) | limit 100"
+```
+
+### **Application Endpoints**
+
+| Endpoint | Method | Description | Response |
+|----------|--------|-------------|----------|
+| `/` | GET | Home page | JSON with app info |
+| `/health` | GET | Health check | Detailed health status |
+| `/info` | GET | App information | System and config details |
+
+#### **Health Endpoint Response**
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-02-11T10:30:00Z",
+  "environment": "dev",
+  "version": "latest",
+  "checks": {
+    "application": "ok",
+    "logging": "ok",
+    "app_insights": "enabled"
+  }
+}
+```
+
+#### **Info Endpoint Response**
+
+```json
+{
+  "application": "DevOps Demo App",
+  "environment": "dev",
+  "version": "latest",
+  "python_version": "3.10.x",
+  "monitoring": {
+    "application_insights": "enabled",
+    "logging_level": "INFO"
+  }
+}
+```
+
+### **Testing Endpoints**
+
+```bash
+# Health check
+curl https://devops-demo-webapp-dev.azurewebsites.net/health
+
+# Application info
+curl https://devops-demo-webapp-dev.azurewebsites.net/info
+
+# From specific IP (if behind proxy)
+curl -H "X-Forwarded-For: YOUR.IP.ADDRESS" https://...
+```
+
+### **Performance Monitoring**
+
+Monitor these key metrics:
+
+- **Response Time:** < 500ms (target)
+- **Error Rate:** < 1% (target)
+- **Availability:** > 99.9% (target)
+- **CPU Usage:** < 70% (normal operation)
+- **Memory Usage:** < 70% (normal operation)
 
 ---
 
-## Testing
+## 🧪 Testing
 
-### Local Testing
+### **Local Testing**
 
-#### Test Docker Build
+#### **Test Docker Build**
 
+```bash
 cd app
 
+# Build image
 docker build -t demo-app:test .
 
+# Run container
 docker run -p 3000:3000 demo-app:test
 
+# Test endpoints
 curl http://localhost:3000/health
+curl http://localhost:3000/info
+curl http://localhost:3000/
+```
 
-### Infrastructure Testing
+#### **Test with Application Insights (Local)**
 
+```bash
+# Set environment variables
+export APPINSIGHTS_INSTRUMENTATIONKEY="your-key"
+export APPLICATIONINSIGHTS_CONNECTION_STRING="your-connection-string"
+
+# Run application
+python app.py
+
+# Generate traffic
+for i in {1..100}; do curl http://localhost:3000/health; done
+```
+
+### **Infrastructure Testing**
+
+```bash
 cd infra
 
+# Initialize Terraform
 terraform init
 
+# Validate configuration
 terraform validate
 
+# Check formatting
 terraform fmt -check
 
-checkov -d . --quiet
+# Run plan
+terraform plan -var-file="environments/dev.tfvars"
 
-### Integration Testing
+# Run security scan
+checkov -d . --quiet
+```
+
+### **Integration Testing**
 
 After deployment:
 
+```bash
+# Get Web App URL
 WEBAPP_URL=$(az webapp show \
   --name devops-demo-webapp-dev \
   --resource-group devops-demo-rg-dev \
   --query defaultHostName -o tsv)
 
+# Test health endpoint
 curl -f https://$WEBAPP_URL/health || echo "Health check failed"
 
-curl -v https://$WEBAPP_URL/health
+# Test response time
+curl -w "\nTime: %{time_total}s\n" https://$WEBAPP_URL/health
+
+# Test from unauthorized IP (should fail with 403)
+curl -v https://$WEBAPP_URL/health  # From non-whitelisted IP
+```
+
+### **Load Testing**
+
+```bash
+# Using Apache Bench
+ab -n 1000 -c 10 https://$WEBAPP_URL/health
+
+# Using hey (modern alternative)
+hey -n 1000 -c 10 https://$WEBAPP_URL/health
+```
 
 ---
 
-## Best Practices
+## 🔧 Troubleshooting
 
-### Infrastructure as Code
+### **Common Issues**
 
-- Use modules for reusability and maintainability
-- Version control all infrastructure code
-- Use Terraform Cloud for state management and collaboration
-- Separate environments using workspaces (dev/prod)
-- Use workspace variables for environment-specific values
-- Document all resources with comments
-- Use consistent naming conventions
-- Implement tag-based organization
+#### **Issue: Web App not accessible (403 Forbidden)**
 
-### Security
+**Cause:** Your IP is not in the whitelist.
 
-- Use Managed Identities over static credentials
-- Minimize stored secrets (only 2 GitHub secrets)
-- Enable vulnerability scanning in CI/CD
-- Use minimal base images (slim, alpine)
-- Implement network restrictions
-- Enable HTTPS-only traffic
-- Use TLS 1.2 or higher
-- Regularly update dependencies
-- Implement RBAC for all resource access
-- Secure sensitive variables in Terraform Cloud
+**Solution:**
 
-### CI/CD
+```bash
+# Get your current public IP
+curl ifconfig.me
 
-- Automate all deployments through CI/CD
-- Use separate workspaces per environment
-- Run security scans in every pipeline
-- Test infrastructure changes in dev first
-- Use semantic versioning for images
-- Enable approval gates for production
-- Implement rollback capabilities
-- Monitor pipeline execution and failures
+# Update infra/main.tf
+ip_restrictions = [
+  {
+    ip_address = "YOUR.NEW.IP.ADDRESS"
+  }
+]
 
-### Monitoring
+# Redeploy
+terraform apply -var-file="environments/dev.tfvars"
+```
 
-- Enable Application Insights from day one
-- Use structured logging for better querying
-- Monitor error rates and exceptions
-- Review logs regularly for anomalies
-- Configure log retention policies
-- Set up alerts for critical metrics
-- Track deployment frequency and success rates
+#### **Issue: Container fails to start**
 
-### Cost Optimization
+**Cause:** Image pull error or application crash.
 
-- Use appropriate SKUs (B1 for dev, P1V2 for prod)
-- Clean up unused resources regularly
-- Monitor spend with Azure Cost Management
-- Use free tier of Terraform Cloud
-- Implement auto-shutdown for dev resources
-- Review reserved instances for prod workloads
+**Solution:**
 
----
+```bash
+# Check container logs
+az webapp log tail \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
 
-## Verification
+# Check if image exists in ACR
+az acr repository show \
+  --name devopsdemoregistry \
+  --image demo-app:latest
 
-### DEV Environment
+# Verify managed identity has AcrPull role
+az role assignment list \
+  --assignee <webapp-principal-id> \
+  --scope <acr-id>
 
-DEV_URL=$(az webapp show \
+# Restart web app
+az webapp restart \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
+```
+
+#### **Issue: Terraform state locked**
+
+**Cause:** Previous run didn't complete or release lock.
+
+**Solution:**
+
+```bash
+# View locks
+az storage container list \
+  --account-name <storage-account> \
+  --query "[?name=='tfstate']"
+
+# Force unlock (use with caution)
+terraform force-unlock <LOCK_ID>
+```
+
+#### **Issue: No logs in Application Insights**
+
+**Cause:** Instrumentation key not configured or sampling disabled.
+
+**Solution:**
+
+```bash
+# Verify instrumentation key
+az webapp config appsettings list \
   --name devops-demo-webapp-dev \
   --resource-group devops-demo-rg-dev \
-  --query defaultHostName -o tsv)
+  --query "[?name=='APPINSIGHTS_INSTRUMENTATIONKEY']"
 
-curl https://$DEV_URL/health
+# Check sampling percentage
+# Should be 100 for dev, lower for prod
 
-### PROD Environment
+# Wait 2-5 minutes for initial telemetry
+# Then check Application Insights in portal
+```
 
-PROD_URL=$(az webapp show \
-  --name devops-demo-webapp-prod \
-  --resource-group devops-demo-rg-prod \
-  --query defaultHostName -o tsv)
+#### **Issue: Health check failing**
 
-curl https://$PROD_URL/health
+**Cause:** Application not responding on `/health`.
 
-### Expected Response
+**Solution:**
 
-Both endpoints should return:
+```bash
+# Check application logs
+az webapp log tail \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
 
-{ "status": "ok" }
+# Verify health endpoint
+curl https://devops-demo-webapp-dev.azurewebsites.net/health
 
-### Additional Verification Steps
+# Check container status
+az webapp show \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev \
+  --query state
 
-1. Check Deployment Status:
+# Review Application Insights for exceptions
+# Azure Portal → Application Insights → Failures
+```
 
-az webapp deployment show --resource-group devops-demo-rg-dev --name devops-demo-webapp-dev
+#### **Issue: CI/CD pipeline failing**
 
-2. View Application Insights
-   - Navigate to Azure Portal → Application Insights → devops-demo-webapp-dev-insights
-   - Check Live Metrics, Failures, Performance
+**Cause:** Missing secrets or permissions.
 
-3. Review Logs:
+**Solution:**
 
-az webapp log tail --resource-group devops-demo-rg-dev --name devops-demo-webapp-dev
+```bash
+# Verify GitHub secrets are set
+# Settings → Secrets and variables → Actions
 
-4. Verify Terraform State
-   - Check Terraform Cloud workspace for successful apply
-   - Review outputs for resource details
+# Check service principal has Contributor role
+az role assignment list --assignee <service-principal-id>
+
+# Test service principal login
+az login --service-principal \
+  -u $ARM_CLIENT_ID \
+  -p $ARM_CLIENT_SECRET \
+  --tenant $ARM_TENANT_ID
+
+# Check workflow logs in GitHub Actions tab
+```
+
+#### **Issue: High response times**
+
+**Cause:** Insufficient resources or inefficient code.
+
+**Solution:**
+
+```bash
+# Check Application Insights performance tab
+# Azure Portal → Application Insights → Performance
+
+# Scale up App Service Plan
+az appservice plan update \
+  --name devops-demo-asp-dev \
+  --resource-group devops-demo-rg-dev \
+  --sku P1V2
+
+# Scale out (add instances)
+az appservice plan update \
+  --name devops-demo-asp-dev \
+  --resource-group devops-demo-rg-dev \
+  --number-of-workers 2
+
+# Review dependency calls in Application Insights
+```
+
+#### **Issue: Memory leaks**
+
+**Cause:** Application not releasing resources.
+
+**Solution:**
+
+```bash
+# Monitor memory usage
+az monitor metrics list \
+  --resource <webapp-id> \
+  --metric MemoryPercentage \
+  --start-time 2024-02-11T00:00:00Z \
+  --interval PT1H
+
+# Check Application Insights for memory trends
+# Investigate long-running requests
+# Review application code for resource management
+
+# Restart as temporary fix
+az webapp restart \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
+```
+
+### **Debugging Commands**
+
+```bash
+# Get all Web App configuration
+az webapp config show \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
+
+# List all app settings
+az webapp config appsettings list \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
+
+# Check deployment logs
+az webapp log deployment list \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
+
+# SSH into container (if enabled)
+az webapp ssh \
+  --name devops-demo-webapp-dev \
+  --resource-group devops-demo-rg-dev
+```
 
 ---
 
-## Future Enhancements
+## 💡 Best Practices
 
-### Phase 1: Enhanced Infrastructure
+### **Infrastructure as Code**
 
-[ ] Implement Virtual Network with private endpoints
-[ ] Make ACR private with private endpoints
-[ ] Enable ACR geo-replication for multi-region
-[ ] Use Premium App Service Plan with auto-scaling
-[ ] Add Azure Firewall for advanced security
-[ ] Implement Azure Bastion for secure access
+- ✅ Use modules for reusability
+- ✅ Version control all infrastructure code
+- ✅ Use remote state with locking
+- ✅ Separate environments (dev/staging/prod)
+- ✅ Use variables for configuration
+- ✅ Document all resources with comments
+- ✅ Use consistent naming conventions
+- ✅ Tag all resources for cost management
 
-### Phase 2: Advanced Application Features
+### **Security**
 
-[ ] Implement readiness/liveness probes
-[ ] Add distributed tracing (OpenTelemetry)
-[ ] Implement API rate limiting
-[ ] Add Redis cache for performance
-[ ] Add authentication/authorization (Azure AD)
-[ ] Implement database layer with Azure SQL
+- ✅ Use Managed Identities over credentials
+- ✅ Store secrets in Key Vault only
+- ✅ Enable vulnerability scanning
+- ✅ Use minimal base images
+- ✅ Implement network restrictions
+- ✅ Enable HTTPS-only traffic
+- ✅ Use TLS 1.2 or higher
+- ✅ Regularly update dependencies
+- ✅ Follow principle of least privilege
 
-### Phase 3: DevOps Maturity
+### **CI/CD**
 
-[ ] Implement blue-green deployments
-[ ] Add canary deployment strategy
-[ ] Implement feature flags
-[ ] Add automated rollback on failure
-[ ] Implement GitOps with Flux/ArgoCD
-[ ] Add cost monitoring and optimization
+- ✅ Automate all deployments
+- ✅ Use separate pipelines per environment
+- ✅ Implement approval gates for production
+- ✅ Run security scans in pipeline
+- ✅ Test infrastructure changes in dev first
+- ✅ Use semantic versioning for images
+- ✅ Enable rollback capabilities
+- ✅ Monitor pipeline health
 
-### Phase 4: Compliance & Governance
+### **Monitoring**
 
-[ ] Implement Azure Policy for compliance
-[ ] Add compliance scanning (CIS benchmarks)
-[ ] Implement comprehensive audit logging
-[ ] Add regulatory compliance checks (SOC 2, ISO 27001)
-[ ] Implement backup and disaster recovery
-[ ] Add SIEM integration for security monitoring
+- ✅ Enable Application Insights from day one
+- ✅ Set up alerts for critical metrics
+- ✅ Use structured logging
+- ✅ Monitor error rates and latency
+- ✅ Track business metrics
+- ✅ Review logs regularly
+- ✅ Set up dashboards for visibility
+- ✅ Configure log retention policies
+
+### **Cost Optimization**
+
+- ✅ Use appropriate SKUs (Basic for dev, Standard/Premium for prod)
+- ✅ Enable auto-scaling in production
+- ✅ Clean up unused resources
+- ✅ Use cost alerts
+- ✅ Review Azure Advisor recommendations
+- ✅ Use reserved instances for predictable workloads
+- ✅ Monitor spend with Cost Management
 
 ---
 
-## Contributing
+## 🚀 Future Enhancements
 
-### 1. Fork the Repository
+### **Phase 1: Enhanced Infrastructure**
 
+- [ ] Implement Virtual Network with private endpoints
+- [ ] Add Azure Front Door for CDN and WAF
+- [ ] Enable ACR geo-replication
+- [ ] Use Premium App Service Plan with auto-scaling
+- [ ] Implement Azure Private Link for ACR and Key Vault
+- [ ] Add Azure Firewall for advanced security
+- [ ] Deploy multi-region for high availability
+
+### **Phase 2: Advanced Application Features**
+
+- [ ] Implement readiness/liveness probes
+- [ ] Add distributed tracing (OpenTelemetry)
+- [ ] Implement API rate limiting
+- [ ] Add Redis cache for performance
+- [ ] Implement CDN for static assets
+- [ ] Add authentication/authorization (Azure AD)
+- [ ] Implement database integration (Cosmos DB/PostgreSQL)
+
+### **Phase 3: DevOps Maturity**
+
+- [ ] Implement blue-green deployments
+- [ ] Add canary deployment strategy
+- [ ] Implement feature flags
+- [ ] Add automated rollback on failure
+- [ ] Implement chaos engineering tests
+- [ ] Add performance testing in pipeline
+- [ ] Implement GitOps with Flux/ArgoCD
+
+### **Phase 4: Observability**
+
+- [ ] Add custom Application Insights metrics
+- [ ] Implement distributed tracing
+- [ ] Add user analytics
+- [ ] Implement real-user monitoring (RUM)
+- [ ] Add synthetic monitoring
+- [ ] Implement AIOps for anomaly detection
+- [ ] Add cost monitoring and alerts
+
+### **Phase 5: Compliance & Governance**
+
+- [ ] Implement Azure Policy
+- [ ] Add compliance scanning (CIS benchmarks)
+- [ ] Implement audit logging
+- [ ] Add regulatory compliance checks
+- [ ] Implement data classification
+- [ ] Add RBAC hardening
+- [ ] Implement backup and disaster recovery
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how to contribute:
+
+### **1. Fork the Repository**
+
+```bash
+# Click "Fork" on GitHub
+# Then clone your fork
 git clone https://github.com/YOUR-USERNAME/azure-devops.git
 cd azure-devops
+```
 
-### 2. Create a Feature Branch
+### **2. Create a Feature Branch**
 
+```bash
 git checkout -b feature/your-feature-name
+```
 
-### 3. Test Your Changes
+### **3. Make Your Changes**
 
+- Follow existing code style
+- Add tests if applicable
+- Update documentation
+- Follow commit message conventions
+
+### **4. Test Your Changes**
+
+```bash
+# Test Terraform changes
 cd infra
 terraform init
 terraform validate
-terraform plan
+terraform plan -var-file="environments/dev.tfvars"
 
+# Test application changes
 cd app
 docker build -t demo-app:test .
 docker run -p 3000:3000 demo-app:test
+```
 
-### 4. Commit and Push
+### **5. Commit and Push**
 
+```bash
 git add .
 git commit -m "feat: add new feature"
 git push origin feature/your-feature-name
+```
 
-### 5. Create a Pull Request
+### **6. Create a Pull Request**
 
-- Describe your changes clearly
+- Go to GitHub and create a PR
+- Describe your changes
 - Link related issues
-- Request review from maintainers
+- Request review
+
+### **Commit Message Convention**
+
+```
+type(scope): subject
+
+body (optional)
+
+footer (optional)
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation
+- `style`: Formatting
+- `refactor`: Code restructuring
+- `test`: Tests
+- `chore`: Maintenance
+
+**Example:**
+
+```
+feat(monitoring): add Application Insights alerts
+
+- Add high error rate alert
+- Add slow response time alert
+- Add health check failure alert
+- Configure alerts for production only
+
+Closes #123
+```
 
 ---
 
-## License
+## 📄 License
 
 This project is for demonstration and educational purposes.
 
 ---
 
-Last Updated: 2026-02-18
-Version: 2.0.0
+## 📞 Support
+
+For issues, questions, or contributions:
+
+- 🐛 **Report bugs:** [GitHub Issues](https://github.com/sachinnm19-design/azure-devops/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/sachinnm19-design/azure-devops/discussions)
+- 📧 **Email:** your-email@example.com
+
+---
+
+## 🙏 Acknowledgments
+
+- Azure documentation and best practices
+- Terraform community
+- GitHub Actions community
+- Open source contributors
+
+---
+
+## 📚 Additional Resources
+
+### **Azure Documentation**
+
+- [Azure App Service](https://docs.microsoft.com/azure/app-service/)
+- [Azure Container Registry](https://docs.microsoft.com/azure/container-registry/)
+- [Application Insights](https://docs.microsoft.com/azure/azure-monitor/app/app-insights-overview)
+- [Azure Key Vault](https://docs.microsoft.com/azure/key-vault/)
+
+### **Terraform**
+
+- [Azure Provider Documentation](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
+- [Terraform Best Practices](https://www.terraform-best-practices.com/)
+
+### **CI/CD**
+
+- [GitHub Actions Documentation](https://docs.github.com/actions)
+- [CI/CD Best Practices](https://docs.microsoft.com/azure/architecture/best-practices/ci-cd)
+
+### **Security**
+
+- [Azure Security Best Practices](https://docs.microsoft.com/azure/security/fundamentals/best-practices-and-patterns)
+- [Container Security](https://docs.microsoft.com/azure/container-registry/container-registry-best-practices)
+
+---
+
+## 📊 Project Status
+
+### **Current Status**
+
+✅ Infrastructure as Code: **Complete**  
+✅ CI/CD Pipeline: **Complete**  
+✅ Security: **Complete**  
+✅ Monitoring: **Complete**  
+✅ Documentation: **Complete**  
+
+### **What's Implemented**
+
+✅ Multi-environment support (dev/prod)  
+✅ Automated CI/CD pipeline  
+✅ Security scanning (Trivy + Checkov)  
+✅ Managed Identity  
+✅ Key Vault integration  
+✅ Application Insights monitoring  
+✅ Log Analytics workspace  
+✅ Health checks with auto-healing  
+✅ IP-based access restrictions  
+✅ HTTPS enforcement with TLS 1.2+  
+✅ Structured application logging  
+✅ Automated alerting  
+✅ Docker containerization  
+✅ Production-ready with Gunicorn  
+
+### **Next Steps**
+
+- [ ] Add automated testing in CI/CD
+- [ ] Implement blue-green deployments
+- [ ] Add performance testing
+- [ ] Implement distributed tracing
+- [ ] Add API documentation with Swagger
+- [ ] Implement database layer
+
+---
+
+**Made with ❤️ for the DevOps Community**
+
+⭐ Star this repository if you found it helpful!
+
+🐛 Found a bug? [Open an issue](https://github.com/sachinnm19-design/azure-devops/issues)
+
+🤝 Want to contribute? Check our [Contributing Guidelines](#-contributing)
+
+---
+
+**Last Updated:** 2024-02-11  
+**Version:** 1.0.0
