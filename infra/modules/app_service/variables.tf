@@ -74,3 +74,13 @@ variable "tags" {
   default     = {}
   description = "Tags to apply to resources"
 }
+
+variable "tenant_id" {
+  type        = string
+  description = "Azure Tenant ID (from data source azurerm_client_config)"
+}
+
+variable "subscription_id" {
+  type        = string
+  description = "Azure Subscription ID (from data source azurerm_subscription)"
+}
