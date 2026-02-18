@@ -20,23 +20,6 @@ resource "azurerm_linux_web_app" "webapp" {
     type = "SystemAssigned"
   }
 
-  # App Service Logs Configuration
-  logs {
-    detailed_error_messages = true
-    failed_request_tracing  = true
-
-    application_logs {
-      file_system_level = "Information"
-    }
-
-    http_logs {
-      file_system {
-        retention_in_mb   = 35
-        retention_in_days = 7
-      }
-    }
-  }
-
   site_config {
 
     container_registry_use_managed_identity = true
@@ -85,20 +68,14 @@ resource "azurerm_linux_web_app" "webapp" {
   # ✅ App Settings
   app_settings = merge(
     {
-      "WEBSITES_ENABLE_APP_SERVICE_STORAGE"       = "false"
-      "APPINSIGHTS_INSTRUMENTATIONKEY"            = var.app_insights_key
       "APPLICATIONINSIGHTS_CONNECTION_STRING"     = var.app_insights_connection_string
-      
-      # Enhanced Application Insights settings
-      "APPLICATIONINSIGHTS_SAMPLING_PERCENTAGE"   = var.environment == "prod" ? "20" : "100"
-      "APPINSIGHTS_PROFILER_ENABLED"              = "1"
-      "APPINSIGHTS_SNAPSHOT_DEBUGGER_ENABLED"     = "0"
-      
+      "APPINSIGHTS_INSTRUMENTATIONKEY"            = var.app_insights_key
+      "AZURE_TENANT_ID"                           = var.tenant_id
+      "AZURE_SUBSCRIPTION_ID"                     = var.subscription_id
       # Application settings
       "ENVIRONMENT"                               = var.environment
       "APP_VERSION"                               = var.image_tag
     },
-    var.additional_app_settings
   )
 
   tags = var.tags

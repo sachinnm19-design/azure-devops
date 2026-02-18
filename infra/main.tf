@@ -8,6 +8,7 @@ resource "azurerm_resource_group" "rg" {
   tags = {
     environment = var.environment
     managed_by  = "terraform"
+    subscription = data.azurerm_subscription.current.display_name
   }
 }
 
@@ -59,22 +60,6 @@ module "acr" {
 }
 
 ############################################
-# Networking Module
-############################################
-module "networking" {
-  source = "./modules/networking"
-
-  resource_prefix     = var.webapp_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  create_nsg          = true
-
-  tags = {
-    environment = var.environment
-  }
-}
-
-############################################
 # App Service Module
 ############################################
 module "app_service" {
@@ -92,6 +77,11 @@ module "app_service" {
   
   app_insights_key               = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
+    # ✅ PASS TENANT ID FROM DATA SOURCE
+  tenant_id       = data.azurerm_client_config.current.tenant_id
+  
+  # ✅ PASS SUBSCRIPTION ID FROM DATA SOURCE
+  subscription_id = data.azurerm_subscription.current.subscription_id
   
   ip_restrictions = [
     {
