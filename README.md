@@ -43,7 +43,7 @@ This project demonstrates a complete DevOps workflow with:
 - **Container Registry:** Azure Container Registry (ACR)
 - **Compute:** Azure App Service (Linux Containers)
 - **Monitoring:** Application Insights + Log Analytics
-- **Security:** Azure Key Vault, Managed Identities
+- **Security:** Managed Identities
 - **CI/CD:** GitHub Actions
 - **Application:** Python Flask (containerized)
   
@@ -140,24 +140,21 @@ This project demonstrates a complete DevOps workflow with:
 
 ### **Infrastructure & Platform**
 
-- ✅ **Multi-environment support** (dev, staging, prod)
+- ✅ **Multi-environment support** (dev, prod)
 - ✅ **Modular Terraform code** for reusability
 - ✅ **Azure Container Registry** for image storage
 - ✅ **App Service with Linux containers**
-- ✅ **Virtual Network** integration ready
 - ✅ **Network Security Groups** for traffic control
 
 ### **Security**
 
 - ✅ **Managed Identity** for Azure resource access
-- ✅ **Azure Key Vault** for secrets management
+- ✅ **Azure Key Vault** for secrets management(optional)
 - ✅ **IP-based access restrictions** with default deny
 - ✅ **TLS 1.2+** enforcement
 - ✅ **HTTPS-only** traffic
-- ✅ **FTP disabled** for security
 - ✅ **Container vulnerability scanning** with Trivy
-- ✅ **Terraform security scanning** with Checkov
-- ✅ **SCM endpoint protection**
+- ✅ **Terraform security scanning** with Checkov(optonal)
 
 ### **CI/CD Pipeline**
 
@@ -165,7 +162,7 @@ This project demonstrates a complete DevOps workflow with:
 - ✅ **Multi-stage deployment** (build → test → deploy)
 - ✅ **Environment-specific configurations**
 - ✅ **Automated security scanning**
-- ✅ **Terraform state management** in Azure
+- ✅ **Terraform state management** in Terraform Cloud
 - ✅ **Pull request validation**
 - ✅ **Production approval gates**
 
@@ -175,7 +172,6 @@ This project demonstrates a complete DevOps workflow with:
 - ✅ **Log Analytics Workspace** for centralized logging
 - ✅ **Structured application logging**
 - ✅ **Health check endpoint** with auto-healing
-- ✅ **Automated alerts** for critical metrics
 - ✅ **Real-time log streaming**
 - ✅ **Request/response logging**
 
@@ -184,7 +180,6 @@ This project demonstrates a complete DevOps workflow with:
 - ✅ **Containerized Python Flask** application
 - ✅ **Production-ready** with Gunicorn
 - ✅ **Health check endpoint** (`/health`)
-- ✅ **Info endpoint** (`/info`)
 - ✅ **Docker health checks**
 - ✅ **Comprehensive error handling**
 
@@ -348,7 +343,7 @@ Create two environments in GitHub:
 
 The Web App uses **System-Assigned Managed Identity** for:
 - ✅ Pulling images from ACR (AcrPull role)
-- ✅ Accessing Key Vault secrets (Get, List permissions)
+- ✅ Accessing Key Vault secrets optional (Get, List permissions)
 - ✅ Secure, credential-free authentication
 
 ### **Infrastructure Modules**
@@ -357,7 +352,6 @@ The Web App uses **System-Assigned Managed Identity** for:
 - Container Registry provisioning
 - SKU selection (Basic/Standard/Premium)
 - Public/private access control
-- Admin user management
 
 #### **App Service Module** (`modules/app_service`)
 - App Service Plan creation
@@ -537,7 +531,6 @@ FROM python:3.10-slim
 - [x] TLS 1.2+ required
 - [x] IP restrictions enabled
 - [x] Default deny on unmatched traffic
-- [x] FTP disabled
 - [x] Managed Identity enabled
 - [x] Secrets in Key Vault
 - [x] Container scanning enabled
@@ -565,7 +558,7 @@ Application Insights is automatically configured and provides:
 # Via Azure Portal
 az monitor app-insights component show \
   --app devops-demo-webapp-dev-insights \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
 # View live metrics
 # Navigate to: Azure Portal → Application Insights → Live Metrics
@@ -596,7 +589,7 @@ traces
 requests
 | where name == "GET /health"
 | summarize 
-    SuccessRate = avg(success)*100, 
+    SuccessRate = avg(toint(success)) * 100,
     Count = count(),
     AvgDuration = avg(duration)
   by bin(timestamp, 5m)
@@ -605,21 +598,11 @@ requests
 
 ### **Monitoring Alerts**
 
-The following alerts are automatically configured:
-
-| Alert | Threshold | Severity | Enabled |
-|-------|-----------|----------|---------|
-| High Error Rate | > 5% | Warning | Prod only |
-| Slow Response Time | > 2000ms | Warning | Prod only |
-| Health Check Failed | < 100 | Critical | Prod only |
-| High CPU Usage | > 80% | Warning | Prod only |
-| High Memory Usage | > 80% | Warning | Prod only |
-
 **View Alerts:**
 
 ```bash
 az monitor metrics alert list \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 ```
 
 ### **Viewing Logs**
@@ -630,12 +613,12 @@ az monitor metrics alert list \
 # Stream application logs
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
 # Stream with filter
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --filter Error
 ```
 
@@ -645,18 +628,8 @@ az webapp log tail \
 # Download all logs
 az webapp log download \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --log-file logs.zip
-```
-
-#### **Query Logs via CLI**
-
-```bash
-# Query Application Insights logs
-az monitor app-insights query \
-  --app devops-demo-webapp-dev-insights \
-  --resource-group devops-demo-rg-dev \
-  --analytics-query "traces | where timestamp > ago(1h) | limit 100"
 ```
 
 ### **Application Endpoint**
@@ -669,14 +642,17 @@ az monitor app-insights query \
 ### **Testing Endpoints**
 
 ```bash
-# Health check
+# Health check from whitlisted IP
 curl https://devops-demo-webapp-dev.azurewebsites.net/health
 
 # Application info
 curl https://devops-demo-webapp-dev.azurewebsites.net/info
 
-# From specific IP (if behind proxy)
-curl -H "X-Forwarded-For: YOUR.IP.ADDRESS" https://...
+# Test from non-whitelisted IP
+curl https://devops-demo-webapp-dev.azurewebsites.net/health
+Response should be below:
+  Error 403 - Forbidden -> The web app you have attempted to reach has blocked your access
+
 ```
 
 ---
@@ -723,7 +699,7 @@ After deployment:
 # Get Web App URL
 WEBAPP_URL=$(az webapp show \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --query defaultHostName -o tsv)
 
 # Test health endpoint
@@ -768,12 +744,8 @@ terraform apply
 # Check container logs
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
-# Check if image exists in ACR
-az acr repository show \
-  --name devopsdemoregistry \
-  --image demo-app:latest
 
 # Verify managed identity has AcrPull role
 az role assignment list \
@@ -783,7 +755,7 @@ az role assignment list \
 # Restart web app
 az webapp restart \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 ```
 
 #### **Issue: No logs in Application Insights**
@@ -796,14 +768,8 @@ az webapp restart \
 # Verify instrumentation key
 az webapp config appsettings list \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --query "[?name=='APPINSIGHTS_INSTRUMENTATIONKEY']"
-
-# Check sampling percentage
-# Should be 100 for dev, lower for prod
-
-# Wait 2-5 minutes for initial telemetry
-# Then check Application Insights in portal
 ```
 
 #### **Issue: Health check failing**
@@ -816,7 +782,7 @@ az webapp config appsettings list \
 # Check application logs
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
 # Verify health endpoint
 curl https://devops-demo-webapp-dev.azurewebsites.net/health
@@ -824,10 +790,9 @@ curl https://devops-demo-webapp-dev.azurewebsites.net/health
 # Check container status
 az webapp show \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --query state
 
-# Review Application Insights for exceptions
 ```
 
 #### **Issue: CI/CD pipeline failing**
@@ -865,13 +830,13 @@ az login --service-principal \
 # Scale up App Service Plan
 az appservice plan update \
   --name devops-demo-asp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --sku P1V2
 
 # Scale out (add instances)
 az appservice plan update \
   --name devops-demo-asp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --number-of-workers 2
 
 # Review dependency calls in Application Insights
