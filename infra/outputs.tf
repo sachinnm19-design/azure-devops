@@ -85,3 +85,18 @@ output "app_insights_connection_string" {
   value       = azurerm_application_insights.app_insights.connection_string
   sensitive   = true
 }
+
+output "key_vault_id" {
+  description = "Key Vault ID"
+  value       = module.key_vault.key_vault_id
+}
+
+output "key_vault_name" {
+  description = "Key Vault name"
+  value       = module.key_vault.key_vault_name
+}
+
+output "key_vault_uri" {
+  description = "Key Vault URI"
+  value       = module.key_vault.key_vault_uri
+}
