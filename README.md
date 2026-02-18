@@ -278,18 +278,22 @@ Each workspace represents a separate environment.
 #### Configure Variables
 
 ##### Terraform Variables
-| Key                  |
-|----------------------|
-| acr_name             |
-| app_service_plan_name|
-| environment          |
-| image_name           |
-| image_tag            |
-| location             |
-| resource_group_name  |
-| sku_name             |
-| sp_object_id         |
-| webapp_name          |
+| Key                           | Dev Example              | Prod Example             | Type   |
+|-------------------------------|--------------------------|--------------------------|--------|
+| acr_name                      | acrdemodev               | acrdemoprod              | string |
+| app_service_plan_name         | asp-demo-dev             | asp-demo-prod            | string |
+| environment                   | dev                      | prod                     | string |
+| image_name                    | demo-app                 | demo-app                 | string |
+| image_tag                     | latest                   | v1.0.0                   | string |
+| location                      | eastus                   | eastus                   | string |
+| resource_group_name           | rg-devops-demo-dev       | rg-devops-demo-prod      | string |
+| sku_name                      | B1                       | P1V2                     | string |
+| sp_object_id                  | <SP_OBJECT_ID>           | <SP_OBJECT_ID>           | string |
+| webapp_name                   | devops-demo-webapp-dev   | devops-demo-webapp-prod  | string |
+| key_vault_name                | kvdemodev2024            | kvdemoprod2024           | string |
+| key_vault_sku                 | "standard"               | "premium"                | string |
+| soft_delete_retention_days    | 90                       | 90                       | number |
+| enable_purge_protection       | true                     | true                     | bool   |
 
 ##### Environment Variables
 | Key                  |
@@ -300,7 +304,6 @@ Each workspace represents a separate environment.
 | ARM_TENANT_ID        |
 
 Mark all sensitive environment variables appropriately in Terraform Cloud.
-
 ---
 
 ### GitHub Repository Setup
@@ -333,8 +336,8 @@ Create two environments in GitHub:
 | Resource Group | Logical container | Per environment |
 | App Service Plan | Compute capacity | B1 (dev), P1V2 (prod) |
 | Web App | Application hosting | Linux container |
-| Container Registry | Image storage | Basic SKU (dev), Premium (prod) |
-| Key Vault | Secrets management | Standard SKU |
+| Container Registry | Image storage | Premium SKU |
+| Key Vault | Secrets management | Standard SKU (dev), Premium SKU (prod) |
 | Application Insights | Monitoring | Web application type |
 | Log Analytics | Centralized logging | PerGB2018 pricing |
 | Network Security Group | Network security | Port 443 allowed |
@@ -362,11 +365,15 @@ The Web App uses **System-Assigned Managed Identity** for:
 - Health check configuration
 - Logging configuration
 
-#### **Networking Module** (`modules/networking`)
-- Virtual Network (optional)
-- Subnets (optional)
-- Network Security Groups
-- Security rules
+#### **Key Vault Module** (`modules/key_vault`) ✨ NEW
+- Azure Key Vault provisioning
+- SKU selection (Standard/Premium)
+- Automatic secrets creation for Application Insights:
+  - `AppInsightsInstrumentationKey`
+  - `AppInsightsConnectionString`
+- Soft delete and purge protection
+- Access policies for Web App Managed Identity (Read-only: Get, List)
+- Access policies for Terraform Service Principal (Full management)
 
 ### **Terraform Commands**
 
@@ -510,6 +517,34 @@ FROM python:3.10-slim
 
 
 #### **Secrets Management**
+
+
+##### **Application Insights Secrets in Azure Key Vault**
+
+All Application Insights credentials are securely stored in **Azure Key Vault** instead of environment variables:
+
+###### **Secrets Stored**
+
+| Secret Name | Description | Retrieved By |
+|------------|-------------|--------------|
+| `AppInsightsInstrumentationKey` | Application Insights instrumentation key for telemetry | Web App (via Managed Identity) |
+| `AppInsightsConnectionString` | Application Insights connection string for diagnostics | Web App (via Managed Identity) |
+
+###### **How Application Insights Secrets are Used**
+
+1. **During Infrastructure Deployment (Terraform):**
+   - Terraform creates the Key Vault
+   - Terraform automatically stores Application Insights credentials in Key Vault
+   - Terraform grants Web App Managed Identity read-only access
+
+2. **At Runtime (Web App):**
+   - Web App app settings reference Key Vault secrets using Azure Key Vault references:
+     ```
+     APPLICATIONINSIGHTS_CONNECTION_STRING = @Microsoft.KeyVault(SecretUri=https://<vault-name>.vault.azure.net/secrets/AppInsightsConnectionString/)
+     APPINSIGHTS_INSTRUMENTATIONKEY = @Microsoft.KeyVault(SecretUri=https://<vault-name>.vault.azure.net/secrets/AppInsightsInstrumentationKey/)
+     ```
+   - Azure automatically resolves these references using Web App's Managed Identity
+   - No credentials are exposed in app settings or logs
 
 - ✅ All secrets in Azure Key Vault
 - ✅ No secrets in code or environment files
