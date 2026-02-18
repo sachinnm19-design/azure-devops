@@ -87,8 +87,7 @@ This project demonstrates a complete DevOps workflow with:
 │  │  │  │Docker Images │  │      │  │  (Container)     │  │  │  │
 │  │  │  │  - Flask App │  │─────▶│  │  (Gunicorn)      │  │  │  │
 │  │  │  └──────────────┘  │      │  └──────────────────┘  │  │  │
-│  │  │                    │      │  ┌──────────────────┐  │  │  │
-│  │  │  (No Key Vault)    │      │  │  Managed Identity│  │  │  │
+│  |                       │      │  │  Managed Identity│  │  │  │
 │  │  │                    │      │  │  (AcrPull Role) │  │  │  │
 │  │  └────────────────────┘      └──────────────────────┘  │  │
 │  │                                                            │  │
