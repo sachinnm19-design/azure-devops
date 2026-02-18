@@ -8,6 +8,7 @@ resource "azurerm_resource_group" "rg" {
   tags = {
     environment = var.environment
     managed_by  = "terraform"
+    subscription = data.azurerm_subscription.current.display_name
   }
 }
 
