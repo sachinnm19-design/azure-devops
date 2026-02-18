@@ -278,18 +278,22 @@ Each workspace represents a separate environment.
 #### Configure Variables
 
 ##### Terraform Variables
-| Key                  |
-|----------------------|
-| acr_name             |
-| app_service_plan_name|
-| environment          |
-| image_name           |
-| image_tag            |
-| location             |
-| resource_group_name  |
-| sku_name             |
-| sp_object_id         |
-| webapp_name          |
+| Key                           | Dev Example              | Prod Example             | Type   |
+|-------------------------------|--------------------------|--------------------------|--------|
+| acr_name                      | acrdemodev               | acrdemoprod              | string |
+| app_service_plan_name         | asp-demo-dev             | asp-demo-prod            | string |
+| environment                   | dev                      | prod                     | string |
+| image_name                    | demo-app                 | demo-app                 | string |
+| image_tag                     | latest                   | v1.0.0                   | string |
+| location                      | eastus                   | eastus                   | string |
+| resource_group_name           | rg-devops-demo-dev       | rg-devops-demo-prod      | string |
+| sku_name                      | B1                       | P1V2                     | string |
+| sp_object_id                  | <SP_OBJECT_ID>           | <SP_OBJECT_ID>           | string |
+| webapp_name                   | devops-demo-webapp-dev   | devops-demo-webapp-prod  | string |
+| key_vault_name                | kvdemodev2024            | kvdemoprod2024           | string |
+| key_vault_sku                 | "standard"               | "premium"                | string |
+| soft_delete_retention_days    | 90                       | 90                       | number |
+| enable_purge_protection       | true                     | true                     | bool   |
 
 ##### Environment Variables
 | Key                  |
@@ -300,7 +304,6 @@ Each workspace represents a separate environment.
 | ARM_TENANT_ID        |
 
 Mark all sensitive environment variables appropriately in Terraform Cloud.
-
 ---
 
 ### GitHub Repository Setup
