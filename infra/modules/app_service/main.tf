@@ -70,6 +70,8 @@ resource "azurerm_linux_web_app" "webapp" {
     {
       "APPLICATIONINSIGHTS_CONNECTION_STRING"     = var.app_insights_connection_string
       "APPINSIGHTS_INSTRUMENTATIONKEY"            = var.app_insights_key
+      "AZURE_TENANT_ID"                           = var.tenant_id
+      "AZURE_SUBSCRIPTION_ID"                     = var.subscription_id
     },
   )
 
