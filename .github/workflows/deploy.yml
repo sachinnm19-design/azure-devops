@@ -80,7 +80,7 @@ jobs:
       - name: Wait for App Startup (DEV)
         run: |
           echo "⏳ Waiting 40 seconds for app to start..."
-          sleep 40
+          sleep 60
 
       - name: Check Web App Health Status (DEV)
         run: |
@@ -169,7 +169,7 @@ jobs:
       - name: Wait for App Startup (PROD)
         run: |
           echo "⏳ Waiting 40 seconds for app to start..."
-          sleep 40
+          sleep 60
 
       - name: Check Web App Health Status (PROD)
         run: |
