@@ -114,11 +114,6 @@ This project demonstrates a complete DevOps workflow with:
 └────────────────────────────┬────────────────────────────────────┘
                              │
                    ┌─────────▼──────────┐
-                   │  Azure Front Door  │
-                   │    (Optional)      │
-                   └─────────┬──────────┘
-                             │
-                   ┌─────────▼──────────┐
                    │   HTTPS (TLS 1.2)  │
                    └─────────┬──────────┘
                              │
@@ -133,8 +128,8 @@ This project demonstrates a complete DevOps workflow with:
                    └─────────┬──────────┘
                              │
                    ┌─────────▼──────────┐
-                   │  Managed Identity  │
-                   │   ACR Pull Access  │
+                   │ (Managed Identity) │
+                   │        ACR         │
                    └────────────────────┘
 ```
 
@@ -179,10 +174,8 @@ This project demonstrates a complete DevOps workflow with:
 - ✅ **Log Analytics Workspace** for centralized logging
 - ✅ **Structured application logging**
 - ✅ **Health check endpoint** with auto-healing
-- ✅ **Performance metrics** (CPU, memory, response time)
 - ✅ **Automated alerts** for critical metrics
 - ✅ **Real-time log streaming**
-- ✅ **Exception tracking** with stack traces
 - ✅ **Request/response logging**
 
 ### **Application**
@@ -202,43 +195,43 @@ This project demonstrates a complete DevOps workflow with:
 .
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml              # CI/CD pipeline definition
+│       ├── pr-validation.yml          # CI – Pull Request validation pipeline
+│       └── deploy.yml                 # CD – Multi-stage deployment pipeline (DEV → PROD)
 │
 ├── app/
-│   ├── app.py                      # Flask application with logging
-│   ├── requirements.txt            # Python dependencies
-│   └── Dockerfile                  # Multi-stage container build
+│   ├── app.py                         # Flask application with health endpoint
+│   ├── requirements.txt               # Python dependencies
+│   └── Dockerfile                     # Container build definition
 │
 ├── infra/
-│   ├── main.tf                     # Main infrastructure resources
-│   ├── provider.tf                 # Azure provider configuration
-│   ├── variables.tf                # Input variables
-│   ├── outputs.tf                  # Output values
-│   ├── datasources.tf              # Data sources
-│   ├── monitoring.tf               # Monitoring alerts
+│   ├── main.tf                        # Root infrastructure composition
+│   ├── provider.tf                    # Terraform + Azure provider config
+│   ├── variables.tf                   # Global input variables
+│   ├── outputs.tf                     # Terraform outputs (ACR, WebApp, etc.)
+│   ├── datasources.tf                 # Azure data sources
 │   │
 │   ├── modules/
-│   │   ├── acr/                    # Container Registry module
+│   │   ├── acr/                       # Azure Container Registry module
 │   │   │   ├── main.tf
 │   │   │   ├── variables.tf
 │   │   │   └── outputs.tf
 │   │   │
-│   │   ├── app_service/            # App Service module
+│   │   ├── app_service/               # App Service + Plan module
 │   │   │   ├── main.tf
 │   │   │   ├── variables.tf
 │   │   │   └── outputs.tf
 │   │   │
-│   │   └── networking/             # Networking module
+│   │   └── networking/                # Optional networking (NSG / IP rules)
 │   │       ├── main.tf
 │   │       ├── variables.tf
 │   │       └── outputs.tf
-│   │
-│   └── environments/
-│       ├── dev.tfvars              # Dev environment variables
-│       └── prod.tfvars             # Prod environment variables
 │
-├── README.md                       # This file
-└── .gitignore                      # Git ignore rules
+├── images/                            # Architecture diagrams (optional)
+│   ├── Azure-Architecture.jpg
+│   └── CICD-Flow.jpg
+│
+├── README.md                          # Project documentation
+
 ```
 
 ---
