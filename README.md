@@ -46,10 +46,10 @@ This project demonstrates a complete DevOps workflow with:
 - **Security:** Azure Key Vault, Managed Identities
 - **CI/CD:** GitHub Actions
 - **Application:** Python Flask (containerized)
+  
 ---
-## 🏗️ Architecture
 
-abc
+## 🏗️ Architecture
 
 ### **High-Level Architecture**
 ```
