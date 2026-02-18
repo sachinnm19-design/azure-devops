@@ -28,6 +28,32 @@ resource "azurerm_log_analytics_workspace" "law" {
 }
 
 ############################################
+# Key Vault Module
+############################################
+module "key_vault" {
+  source = "./modules/key_vault"
+
+  key_vault_name                      = "kv-${var.webapp_name}-${var.environment}"
+  resource_group_name                 = azurerm_resource_group.rg.name
+  location                            = var.location
+  tenant_id                           = data.azurerm_client_config.current.tenant_id
+  webapp_principal_id                 = module.app_service.webapp_principal_id
+  
+  app_insights_instrumentation_key    = azurerm_application_insights.app_insights.instrumentation_key
+  app_insights_connection_string      = azurerm_application_insights.app_insights.connection_string
+  
+  sku_name                            = "standard"
+  enable_purge_protection             = true
+  soft_delete_retention_days          = 90
+
+  tags = {
+    environment = var.environment
+  }
+
+  depends_on = [module.app_service]
+}
+
+############################################
 # Application Insights
 ############################################
 resource "azurerm_application_insights" "app_insights" {
