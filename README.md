@@ -8,8 +8,8 @@ A production-ready DevOps demonstration project showcasing Infrastructure as Cod
 
 - [Overview](#-overview)
 - [Architecture](#-architecture)
-- [Project Structure](#-project-structure)
 - [Features](#-features)
+- [Project Structure](#-project-structure)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
 - [Infrastructure](#-infrastructure)
@@ -246,9 +246,9 @@ Before setting up this project, ensure you have:
 
 ---
 
-## Azure Setup
+### Azure Setup
 
-### Create a Service Principal
+#### Create a Service Principal
 
 Create a Service Principal with Contributor access:
 
