@@ -60,7 +60,7 @@ module "acr" {
 }
 
 ############################################
-# Key Vault Module (MUST BE BEFORE app_service)
+# Key Vault Module
 ############################################
 module "key_vault" {
   source = "./modules/key_vault"
@@ -69,7 +69,8 @@ module "key_vault" {
   resource_group_name                 = azurerm_resource_group.rg.name
   location                            = var.location
   tenant_id                           = data.azurerm_client_config.current.tenant_id
-  webapp_principal_id                 = ""  # ✅ Empty string instead of null (will be set via separate access policy)
+  webapp_principal_id                 = ""
+  terraform_sp_object_id              = var.sp_object_id  # ✅ Pass the Service Principal Object ID
   
   app_insights_instrumentation_key    = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string      = azurerm_application_insights.app_insights.connection_string
@@ -82,6 +83,7 @@ module "key_vault" {
     environment = var.environment
   }
 }
+
 ############################################
 # App Service Module
 ############################################
