@@ -65,7 +65,7 @@ module "acr" {
 module "key_vault" {
   source = "./modules/key_vault"
 
-  key_vault_name                      = "kv-${substr(var.webapp_name, 0, 12)}-${var.environment}"
+  key_vault_name                      = var.key_vault_name
   resource_group_name                 = azurerm_resource_group.rg.name
   location                            = var.location
   tenant_id                           = data.azurerm_client_config.current.tenant_id
