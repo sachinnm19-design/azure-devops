@@ -69,6 +69,7 @@ resource "azurerm_linux_web_app" "webapp" {
   app_settings = merge(
     {
       "APPLICATIONINSIGHTS_CONNECTION_STRING"     = var.app_insights_connection_string
+      "APPINSIGHTS_INSTRUMENTATIONKEY"            = var.app_insights_key
     },
   )
 
