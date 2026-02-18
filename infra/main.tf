@@ -59,22 +59,6 @@ module "acr" {
 }
 
 ############################################
-# Networking Module
-############################################
-module "networking" {
-  source = "./modules/networking"
-
-  resource_prefix     = var.webapp_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  create_nsg          = true
-
-  tags = {
-    environment = var.environment
-  }
-}
-
-############################################
 # App Service Module
 ############################################
 module "app_service" {
