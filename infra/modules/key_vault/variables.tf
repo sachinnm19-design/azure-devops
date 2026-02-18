@@ -64,3 +64,9 @@ variable "sku_name" {
     error_message = "SKU must be standard or premium"
   }
 }
+
+variable "terraform_sp_object_id" {
+  type        = string
+  description = "Object ID of the Service Principal used by Terraform (GitHub Actions)"
+  default     = ""
+}
