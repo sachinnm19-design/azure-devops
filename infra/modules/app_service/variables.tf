@@ -38,46 +38,21 @@ variable "acr_login_server" {
   description = "ACR login server URL"
 }
 
-# ✅ NEW: Key Vault Name - Required for KeyVault references
-variable "key_vault_name" {
-  type        = string
-  description = "Name of the Azure Key Vault containing secrets (without .vault.azure.net)"
-}
-
-# ✅ OPTIONAL: Key Vault Resource Group (if different from app RG)
-variable "key_vault_resource_group_name" {
-  type        = string
-  default     = ""
-  description = "Resource group name of Key Vault (defaults to current RG if empty)"
-}
-
 variable "app_insights_key" {
   type        = string
   default     = ""
-  description = "Application Insights instrumentation key (can be empty if using Key Vault)"
+  description = "Application Insights instrumentation key"
 }
 
 variable "app_insights_connection_string" {
   type        = string
   default     = ""
-  description = "Application Insights connection string (can be empty if using Key Vault)"
+  description = "Application Insights connection string"
 }
 
 variable "environment" {
   type        = string
   description = "Environment name (dev, staging, prod)"
-}
-
-# ✅ Tenant ID from Azure AD
-variable "tenant_id" {
-  type        = string
-  description = "Azure Tenant ID from data source azurerm_client_config - Used for Azure AD authentication"
-}
-
-# ✅ Subscription ID from Azure
-variable "subscription_id" {
-  type        = string
-  description = "Azure Subscription ID from data source azurerm_subscription - Used for resource management"
 }
 
 variable "ip_restrictions" {
@@ -91,11 +66,32 @@ variable "ip_restrictions" {
 variable "additional_app_settings" {
   type        = map(string)
   default     = {}
-  description = "Additional app settings (application-specific key-value pairs)"
+  description = "Additional app settings"
 }
 
 variable "tags" {
   type        = map(string)
   default     = {}
   description = "Tags to apply to resources"
+}
+
+variable "tenant_id" {
+  type        = string
+  description = "Azure Tenant ID (from data source azurerm_client_config)"
+}
+
+variable "subscription_id" {
+  type        = string
+  description = "Azure Subscription ID (from data source azurerm_subscription)"
+}
+
+# ✅ NEW - Key Vault variables
+variable "key_vault_name" {
+  type        = string
+  description = "Name of the Key Vault for secret references"
+}
+
+variable "key_vault_uri" {
+  type        = string
+  description = "URI of the Key Vault for secret references"
 }
