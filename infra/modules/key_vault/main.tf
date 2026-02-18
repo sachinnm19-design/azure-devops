@@ -11,8 +11,10 @@ resource "azurerm_key_vault" "kv" {
   tags = var.tags
 }
 
-# ✅ Grant Web App Managed Identity access to Key Vault
+# ✅ Grant Web App Managed Identity access to Key Vault (only if principal_id provided)
 resource "azurerm_key_vault_access_policy" "webapp_access" {
+  count = var.webapp_principal_id != "" ? 1 : 0  # ✅ Only create if principal_id is not empty
+  
   key_vault_id       = azurerm_key_vault.kv.id
   tenant_id          = var.tenant_id
   object_id          = var.webapp_principal_id
