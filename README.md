@@ -565,7 +565,7 @@ Application Insights is automatically configured and provides:
 # Via Azure Portal
 az monitor app-insights component show \
   --app devops-demo-webapp-dev-insights \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
 # View live metrics
 # Navigate to: Azure Portal → Application Insights → Live Metrics
@@ -596,7 +596,7 @@ traces
 requests
 | where name == "GET /health"
 | summarize 
-    SuccessRate = avg(success)*100, 
+    SuccessRate = avg(toint(success)) * 100,
     Count = count(),
     AvgDuration = avg(duration)
   by bin(timestamp, 5m)
@@ -605,21 +605,11 @@ requests
 
 ### **Monitoring Alerts**
 
-The following alerts are automatically configured:
-
-| Alert | Threshold | Severity | Enabled |
-|-------|-----------|----------|---------|
-| High Error Rate | > 5% | Warning | Prod only |
-| Slow Response Time | > 2000ms | Warning | Prod only |
-| Health Check Failed | < 100 | Critical | Prod only |
-| High CPU Usage | > 80% | Warning | Prod only |
-| High Memory Usage | > 80% | Warning | Prod only |
-
 **View Alerts:**
 
 ```bash
 az monitor metrics alert list \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 ```
 
 ### **Viewing Logs**
@@ -630,12 +620,12 @@ az monitor metrics alert list \
 # Stream application logs
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
 # Stream with filter
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --filter Error
 ```
 
@@ -645,18 +635,8 @@ az webapp log tail \
 # Download all logs
 az webapp log download \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --log-file logs.zip
-```
-
-#### **Query Logs via CLI**
-
-```bash
-# Query Application Insights logs
-az monitor app-insights query \
-  --app devops-demo-webapp-dev-insights \
-  --resource-group devops-demo-rg-dev \
-  --analytics-query "traces | where timestamp > ago(1h) | limit 100"
 ```
 
 ### **Application Endpoint**
@@ -669,14 +649,17 @@ az monitor app-insights query \
 ### **Testing Endpoints**
 
 ```bash
-# Health check
+# Health check from whitlisted IP
 curl https://devops-demo-webapp-dev.azurewebsites.net/health
 
 # Application info
 curl https://devops-demo-webapp-dev.azurewebsites.net/info
 
-# From specific IP (if behind proxy)
-curl -H "X-Forwarded-For: YOUR.IP.ADDRESS" https://...
+# Test from non-whitelisted IP
+curl https://devops-demo-webapp-dev.azurewebsites.net/health
+Response should be below:
+  Error 403 - Forbidden -> The web app you have attempted to reach has blocked your access
+
 ```
 
 ---
@@ -723,7 +706,7 @@ After deployment:
 # Get Web App URL
 WEBAPP_URL=$(az webapp show \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --query defaultHostName -o tsv)
 
 # Test health endpoint
@@ -768,12 +751,8 @@ terraform apply
 # Check container logs
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
-# Check if image exists in ACR
-az acr repository show \
-  --name devopsdemoregistry \
-  --image demo-app:latest
 
 # Verify managed identity has AcrPull role
 az role assignment list \
@@ -783,7 +762,7 @@ az role assignment list \
 # Restart web app
 az webapp restart \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 ```
 
 #### **Issue: No logs in Application Insights**
@@ -796,14 +775,8 @@ az webapp restart \
 # Verify instrumentation key
 az webapp config appsettings list \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --query "[?name=='APPINSIGHTS_INSTRUMENTATIONKEY']"
-
-# Check sampling percentage
-# Should be 100 for dev, lower for prod
-
-# Wait 2-5 minutes for initial telemetry
-# Then check Application Insights in portal
 ```
 
 #### **Issue: Health check failing**
@@ -816,7 +789,7 @@ az webapp config appsettings list \
 # Check application logs
 az webapp log tail \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev
+  --resource-group rg-devops-demo-dev
 
 # Verify health endpoint
 curl https://devops-demo-webapp-dev.azurewebsites.net/health
@@ -824,10 +797,9 @@ curl https://devops-demo-webapp-dev.azurewebsites.net/health
 # Check container status
 az webapp show \
   --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --query state
 
-# Review Application Insights for exceptions
 ```
 
 #### **Issue: CI/CD pipeline failing**
@@ -865,13 +837,13 @@ az login --service-principal \
 # Scale up App Service Plan
 az appservice plan update \
   --name devops-demo-asp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --sku P1V2
 
 # Scale out (add instances)
 az appservice plan update \
   --name devops-demo-asp-dev \
-  --resource-group devops-demo-rg-dev \
+  --resource-group rg-devops-demo-dev \
   --number-of-workers 2
 
 # Review dependency calls in Application Insights
