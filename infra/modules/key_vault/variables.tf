@@ -21,6 +21,7 @@ variable "tenant_id" {
 variable "webapp_principal_id" {
   type        = string
   description = "Principal ID of the Web App Managed Identity for Key Vault access"
+  default     = ""  # ✅ Add default to make it optional
 }
 
 variable "app_insights_instrumentation_key" {
