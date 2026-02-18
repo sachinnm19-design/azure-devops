@@ -8,10 +8,6 @@ output "tenant_id" {
   value       = data.azurerm_client_config.current.tenant_id
 }
 
-output "registered_resource_providers" {
-  value = data.azurerm_resource_providers.current.provider_names
-}
-
 output "resource_group_id" {
   description = "Resource Group ID"
   value       = azurerm_resource_group.rg.id
