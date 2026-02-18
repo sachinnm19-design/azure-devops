@@ -42,9 +42,9 @@ module "key_vault" {
   app_insights_instrumentation_key    = azurerm_application_insights.app_insights.instrumentation_key
   app_insights_connection_string      = azurerm_application_insights.app_insights.connection_string
   
-  sku_name                            = "standard"
-  enable_purge_protection             = true
-  soft_delete_retention_days          = 90
+  sku_name                            = var.key_vault_sku
+  enable_purge_protection             = var.enable_purge_protection
+  soft_delete_retention_days          = var.soft_delete_retention_days
 
   tags = {
     environment = var.environment
