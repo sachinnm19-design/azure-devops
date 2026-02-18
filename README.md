@@ -236,113 +236,131 @@ This project demonstrates a complete DevOps workflow with:
 
 ---
 
-## 🔧 Prerequisites
+---
 
-### **Required Tools**
+## 4. Application Details
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Azure CLI | 2.50+ | Azure resource management |
-| Terraform | 1.5+ | Infrastructure provisioning |
-| Docker | 20.10+ | Container builds and testing |
-| Git | 2.30+ | Version control |
-| GitHub Account | - | Code hosting and CI/CD |
-
-### **Azure Requirements**
-
-- Active Azure subscription
-- Contributor or Owner role on subscription
-- Service Principal for Terraform
-- Resource quotas for:
-  - App Service Plans
-  - Container Registries
-  - Key Vaults
-  - Log Analytics Workspaces
+- Simple containerized application using Flask (Python)
+- Exposes a health endpoint:
+    ```
+    GET /health
+    Response: { "status": "ok" }
+    ```
+- Application listens on port **3000**
+- Dockerized using a standard Dockerfile
 
 ---
 
-## 🚀 Quick Start
+## 5. Prerequisites
 
-### **1. Clone the Repository**
+Before setting up this project, ensure you have:
+
+- An active Azure subscription
+- A GitHub account
+- A Terraform Cloud account
+- Basic knowledge of Git, Terraform, and Azure
+
+---
+
+## 6. Azure Setup
+
+### 6.1 Create a Service Principal
+
+Create a Service Principal with Contributor access:
 
 ```bash
-git clone https://github.com/sachinnm19-design/azure-devops.git
-cd azure-devops
-```
-
-### **2. Set Up Azure Service Principal**
-
-```bash
-# Login to Azure
-az login
-
-# Set subscription
-az account set --subscription "<your-subscription-id>"
-
-# Create Service Principal
 az ad sp create-for-rbac \
-  --name "terraform-sp" \
+  --name devops-demo-sp \
   --role Contributor \
-  --scopes /subscriptions/<subscription-id>
-
-# Output (save these values):
-# {
-#   "appId": "xxxx",           # ARM_CLIENT_ID
-#   "password": "xxxx",        # ARM_CLIENT_SECRET
-#   "tenant": "xxxx"           # ARM_TENANT_ID
-# }
+  --scopes /subscriptions/<SUBSCRIPTION_ID> \
+  --sdk-auth
 ```
 
-### **3. Configure GitHub Secrets**
+Save the JSON output securely. It will be used in GitHub and Terraform Cloud.
 
-Add the following secrets to your GitHub repository:
+### 6.2 Key Vault Setup
 
-```
-Settings → Secrets and variables → Actions → New repository secret
-```
+#### 6.2.1 Create Key Vault
+Key Vault is automatically provisioned by Terraform using the configuration in `infra/main.tf`:
+- Key Vault is named dynamically as `<acr_name>-kv` (based on the ACR name).
+- Secrets for ACR credentials (`acr-admin-username`, `acr-admin-password`) are securely populated by Terraform.
 
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `AZURE_CLIENT_ID` | Service Principal App ID | Terraform authentication |
-| `AZURE_CLIENT_SECRET` | Service Principal Password | Terraform authentication |
-| `AZURE_SUBSCRIPTION_ID` | Your subscription ID | Target Azure subscription |
-| `AZURE_TENANT_ID` | Your tenant ID | Azure AD tenant |
-| `ARM_CLIENT_ID` | Same as AZURE_CLIENT_ID | Terraform provider auth |
-| `ARM_CLIENT_SECRET` | Same as AZURE_CLIENT_SECRET | Terraform provider auth |
-| `ARM_SUBSCRIPTION_ID` | Same as AZURE_SUBSCRIPTION_ID | Terraform provider auth |
-| `ARM_TENANT_ID` | Same as AZURE_TENANT_ID | Terraform provider auth |
+#### 6.2.2 Access Policies
+Terraform sets up the Key Vault Access Policies as follows:
+- **Terraform Service Principal:** Full permissions for provisioning and managing secrets.
+- **Web App Managed Identity:** Read-only access (`Get`, `List`) for retrieving secrets at runtime.
 
-### **4. Create Storage Account for Terraform State**
-
+To review Access Policies:
 ```bash
-# Create resource group
-az group create \
-  --name terraform-state-rg \
-  --location eastus
-
-# Create storage account
-az storage account create \
-  --name tfstatedevops$(date +%s) \
-  --resource-group terraform-state-rg \
-  --location eastus \
-  --sku Standard_LRS
-
-# Create container
-az storage container create \
-  --name tfstate \
-  --account-name <storage-account-name>
-
-# Get storage account key
-az storage account keys list \
-  --resource-group terraform-state-rg \
-  --account-name <storage-account-name> \
-  --query "[0].value" -o tsv
+az keyvault show --name <key-vault-name> --query properties.accessPolicies
 ```
 
-Add these to GitHub secrets:
-- `TF_STATE_STORAGE_ACCOUNT`: Storage account name
-- `TF_STATE_STORAGE_KEY`: Storage account key
+---
 
+## 7. Terraform Cloud Setup
+
+### 7.1 Create an Organization
+- Sign in to [Terraform Cloud](https://app.terraform.io)
+- Create an organization (example: `AzureDevOpsDemo`)
+
+### 7.2 Create Workspaces
+Create two workspaces:
+
+| Workspace Name       |
+|-----------------------|
+| devops-demo-dev       |
+| devops-demo-prod      |
+
+Each workspace represents a separate environment.
+
+### 7.3 Configure Variables
+
+#### Terraform Variables
+| Key                  |
+|----------------------|
+| acr_name             |
+| app_service_plan_name|
+| environment          |
+| image_name           |
+| image_tag            |
+| location             |
+| resource_group_name  |
+| sku_name             |
+| sp_object_id         |
+| webapp_name          |
+
+#### Environment Variables
+| Key                  |
+|----------------------|
+| ARM_CLIENT_ID        | 
+| ARM_CLIENT_SECRET    | 
+| ARM_SUBSCRIPTION_ID  | 
+| ARM_TENANT_ID        |
+
+Mark all sensitive environment variables appropriately in Terraform Cloud.
+
+---
+
+## 8. GitHub Repository Setup
+
+### 8.1 GitHub Secrets
+Add the following secrets to your repository:
+
+| Secret Name         | Description                             |
+|---------------------|-----------------------------------------|
+| AZURE_CREDENTIALS   | Service Principal JSON from Azure       |
+| TF_API_TOKEN        | Terraform Cloud API token               |
+
+---
+
+### 8.2 GitHub Environments
+Create two environments in GitHub:
+| Environment | Requires Approval |
+|-------------|--------------------|
+| dev         | No                |
+| prod        | Yes               |
+
+---
 ### **5. Update Configuration Files**
 
 **Update `infra/provider.tf`:**
