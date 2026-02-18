@@ -11,7 +11,6 @@ A production-ready DevOps demonstration project showcasing Infrastructure as Cod
 - [Features](#-features)
 - [Project Structure](#-project-structure)
 - [Prerequisites](#-prerequisites)
-- [Quick Start](#-quick-start)
 - [Infrastructure](#-infrastructure)
 - [CI/CD Pipeline](#-cicd-pipeline)
 - [Security](#-security)
@@ -49,6 +48,8 @@ This project demonstrates a complete DevOps workflow with:
 - **Application:** Python Flask (containerized)
 ---
 ## 🏗️ Architecture
+
+abc
 
 ### **High-Level Architecture**
 ```
