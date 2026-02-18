@@ -236,22 +236,7 @@ This project demonstrates a complete DevOps workflow with:
 
 ---
 
----
-
-## 4. Application Details
-
-- Simple containerized application using Flask (Python)
-- Exposes a health endpoint:
-    ```
-    GET /health
-    Response: { "status": "ok" }
-    ```
-- Application listens on port **3000**
-- Dockerized using a standard Dockerfile
-
----
-
-## 5. Prerequisites
+## Prerequisites
 
 Before setting up this project, ensure you have:
 
@@ -262,9 +247,9 @@ Before setting up this project, ensure you have:
 
 ---
 
-## 6. Azure Setup
+## Azure Setup
 
-### 6.1 Create a Service Principal
+### Create a Service Principal
 
 Create a Service Principal with Contributor access:
 
@@ -278,13 +263,13 @@ az ad sp create-for-rbac \
 
 Save the JSON output securely. It will be used in GitHub and Terraform Cloud.
 
-## 7. Terraform Cloud Setup
+## Terraform Cloud Setup
 
-### 7.1 Create an Organization
+### Create an Organization
 - Sign in to [Terraform Cloud](https://app.terraform.io)
 - Create an organization (example: `AzureDevOpsDemo`)
 
-### 7.2 Create Workspaces
+### Create Workspaces
 Create two workspaces:
 
 | Workspace Name       |
@@ -294,7 +279,7 @@ Create two workspaces:
 
 Each workspace represents a separate environment.
 
-### 7.3 Configure Variables
+### Configure Variables
 
 #### Terraform Variables
 | Key                  |
@@ -322,9 +307,9 @@ Mark all sensitive environment variables appropriately in Terraform Cloud.
 
 ---
 
-## 8. GitHub Repository Setup
+## GitHub Repository Setup
 
-### 8.1 GitHub Secrets
+### GitHub Secrets
 Add the following secrets to your repository:
 
 | Secret Name         | Description                             |
@@ -334,73 +319,12 @@ Add the following secrets to your repository:
 
 ---
 
-### 8.2 GitHub Environments
+### GitHub Environments
 Create two environments in GitHub:
 | Environment | Requires Approval |
 |-------------|--------------------|
 | dev         | No                |
 | prod        | Yes               |
-
----
-### **5. Update Configuration Files**
-
-**Update `infra/provider.tf`:**
-
-```hcl
-terraform {
-  backend "azurerm" {
-    resource_group_name  = "terraform-state-rg"
-    storage_account_name = "<your-storage-account-name>"
-    container_name       = "tfstate"
-    key                  = "terraform.tfstate"
-  }
-}
-```
-
-**Update IP restrictions in `infra/main.tf`:**
-
-```hcl
-ip_restrictions = [
-  {
-    ip_address = "YOUR.IP.ADDRESS.HERE"  # Replace with your IP
-  }
-]
-```
-
-### **6. Deploy**
-
-```bash
-# Create feature branch
-git checkout -b feature/initial-setup
-
-# Commit changes
-git add .
-git commit -m "Initial setup with custom configuration"
-git push origin feature/initial-setup
-
-# Create Pull Request on GitHub
-# Merge to main branch
-```
-
-The CI/CD pipeline will automatically:
-1. ✅ Build the Docker image
-2. ✅ Run security scans
-3. ✅ Deploy infrastructure
-4. ✅ Deploy application
-
-### **7. Verify Deployment**
-
-```bash
-# Get the Web App URL
-az webapp show \
-  --name devops-demo-webapp-dev \
-  --resource-group devops-demo-rg-dev \
-  --query defaultHostName -o tsv
-
-# Test the application
-curl https://<webapp-url>/health
-curl https://<webapp-url>/info
-```
 
 ---
 
@@ -524,9 +448,9 @@ terraform destroy -var-file="environments/dev.tfvars"
 - ✅ **Manual approval** for production (optional)
 - ✅ **Rollback capability**
 
-### **Workflow File**
+### **Workflow Files**
 
-Located at `.github/workflows/deploy.yml`
+Located at `.github/workflows/pr-validation.yml` & `.github/workflows/deploy.yml`
 
 Key steps:
 1. **Checkout code**
@@ -536,18 +460,6 @@ Key steps:
 5. **Terraform init/plan/apply**
 6. **Push image to ACR**
 7. **Restart Web App**
-
-### **Environment Variables**
-
-Set in GitHub Actions workflow:
-
-```yaml
-env:
-  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  RESOURCE_GROUP: devops-demo-rg-${{ github.ref == 'refs/heads/main' && 'dev' || 'dev' }}
-  WEBAPP_NAME: devops-demo-webapp-${{ github.ref == 'refs/heads/main' && 'dev' || 'dev' }}
-  ACR_NAME: devopsdemoregistry
-```
 
 ---
 
@@ -569,20 +481,11 @@ ip_restrictions = [
 ip_restriction_default_action = "Deny"  # Block all other IPs
 ```
 
-#### **SCM (Deployment) Protection**
-
-Deployment endpoints are also protected:
-
-```hcl
-scm_ip_restriction_default_action = "Deny"
-```
-
 #### **TLS/SSL Configuration**
 
 ```hcl
 https_only          = true
 minimum_tls_version = "1.2"  # Can be upgraded to 1.3
-ftps_state          = "Disabled"
 ```
 
 ### **Container Security**
@@ -609,18 +512,6 @@ FROM python:3.10-slim
 # USER appuser
 ```
 
-### **Infrastructure Security**
-
-#### **Terraform Security Scanning**
-
-Automated with Checkov:
-
-```bash
-checkov -d infra/ \
-  --quiet \
-  --compact \
-  --skip-check CKV_AZURE_*
-```
 
 #### **Secrets Management**
 
