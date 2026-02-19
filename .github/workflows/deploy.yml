@@ -8,7 +8,7 @@ on:
 
 env:
   IMAGE_NAME: demo-app
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: latest
 
 jobs:
 # =====================================================
@@ -36,7 +36,7 @@ jobs:
       - name: Upload Image Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: docker-image-${{ github.sha }}
+          name: docker-image-latest
           path: /tmp/image.tar
           retention-days: 1
 
@@ -84,7 +84,7 @@ jobs:
       - name: Download Docker Image Artifact
         uses: actions/download-artifact@v4
         with:
-          name: docker-image-${{ github.sha }}
+          name: docker-image-latest
           path: /tmp
 
       - name: Load Docker Image
@@ -176,7 +176,7 @@ jobs:
       - name: Download Docker Image Artifact
         uses: actions/download-artifact@v4
         with:
-          name: docker-image-${{ github.sha }}
+          name: docker-image-latest
           path: /tmp
 
       - name: Load Docker Image
