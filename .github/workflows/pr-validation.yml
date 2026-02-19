@@ -7,15 +7,15 @@ on:
 
 env:
   IMAGE_NAME: demo-app
-  IMAGE_TAG: latest
+  IMAGE_TAG: ${{ github.sha }}
   TF_WORKSPACE: dev
 
 jobs:
 # =====================================================
-# STAGE 1: BUILD & TEST
+# STAGE 1: BUILD DOCKER IMAGE (ONCE)
 # =====================================================
   build:
-    name: Build & Test
+    name: Build Docker Image
     runs-on: ubuntu-latest
 
     steps:
@@ -26,10 +26,38 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          push: false
+          outputs: type=docker,dest=/tmp/image.tar
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+      - name: Upload Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: /tmp/image.tar
+          retention-days: 7
+
+# =====================================================
+# STAGE 2: TEST CONTAINER
+# =====================================================
+  test:
+    name: Test Container
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: /tmp
+
+      - name: Load Docker Image
         run: |
-          docker build \
-            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ./app
+          docker load --input /tmp/image.tar
 
       - name: Test Container Locally
         run: |
@@ -39,7 +67,7 @@ jobs:
           docker stop test-app
 
 # =====================================================
-# STAGE 2: SECURITY SCANNING (Docker)
+# STAGE 3: SECURITY SCANNING (Docker)
 # =====================================================
   security-scan:
     name: Security Scan
@@ -51,17 +79,15 @@ jobs:
       security-events: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Download Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: /tmp
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker Image
+      - name: Load Docker Image
         run: |
-          docker build \
-            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            ./app
+          docker load --input /tmp/image.tar
 
       - name: Run Trivy Security Scan
         uses: aquasecurity/trivy-action@master
@@ -79,11 +105,10 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
 # =====================================================
-# STAGE 3: TERRAFORM VALIDATION
+# STAGE 4: TERRAFORM VALIDATION
 # =====================================================
   terraform-checks:
     name: Terraform Validation
-    needs: build
     runs-on: ubuntu-latest
     env:
       TF_WORKSPACE: dev
@@ -110,11 +135,11 @@ jobs:
         run: terraform plan
 
 # =====================================================
-# STAGE 4: ALL CHECKS PASSED
+# STAGE 5: ALL CHECKS PASSED
 # =====================================================
   all-checks-passed:
     name: All Checks Passed
-    needs: [build, security-scan, terraform-checks]
+    needs: [build, test, security-scan, terraform-checks]
     runs-on: ubuntu-latest
     
     steps:
