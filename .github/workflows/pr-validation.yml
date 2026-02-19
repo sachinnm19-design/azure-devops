@@ -1,23 +1,115 @@
-name: Deploy to Azure
+name: PR Checks & Validation
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  workflow_dispatch:
 
 env:
   IMAGE_NAME: demo-app
-  IMAGE_TAG: ${{ github.sha }}  # ✅ Same SHA as CI
+  IMAGE_TAG: ${{ github.sha }}
+  TF_WORKSPACE: dev
 
 jobs:
 # =====================================================
-# DEPLOY TO DEV
+# STAGE 1: BUILD DOCKER IMAGE (ONCE)
 # =====================================================
-  deploy-dev:
-    name: Deploy to DEV
+  build:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    environment: dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          push: false
+          outputs: type=docker,dest=/tmp/image.tar
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+      - name: Upload Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: /tmp/image.tar
+          retention-days: 7
+
+# =====================================================
+# STAGE 2: TEST CONTAINER
+# =====================================================
+  test:
+    name: Test Container
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: /tmp
+
+      - name: Load Docker Image
+        run: |
+          docker load --input /tmp/image.tar
+
+      - name: Test Container Locally
+        run: |
+          docker run -d -p 3000:3000 --name test-app ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          sleep 10
+          curl -f http://localhost:3000/health || exit 1
+          docker stop test-app
+
+# =====================================================
+# STAGE 3: SECURITY SCANNING (Docker)
+# =====================================================
+  security-scan:
+    name: Security Scan
+    needs: build
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Download Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: /tmp
+
+      - name: Load Docker Image
+        run: |
+          docker load --input /tmp/image.tar
+
+      - name: Run Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+# =====================================================
+# STAGE 4: TERRAFORM VALIDATION
+# =====================================================
+  terraform-checks:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
     env:
       TF_WORKSPACE: dev
 
@@ -25,11 +117,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Login to Azure
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -39,169 +126,22 @@ jobs:
         working-directory: infra
         run: terraform init
 
-      - name: Terraform Apply (Infrastructure)
+      - name: Terraform Validate
         working-directory: infra
-        run: terraform apply -auto-approve
+        run: terraform validate
 
-      # ✅ Get ACR details AFTER infra is created
-      - name: Export Terraform Outputs
+      - name: Terraform Plan (Dev)
         working-directory: infra
-        run: |
-          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
-
-      # ✅ Download image built in CI pipeline
-      - name: Download Docker Image Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image-${{ github.sha }}
-          path: /tmp
-
-      # ✅ Load the Docker image
-      - name: Load Docker Image
-        run: |
-          docker load --input /tmp/image.tar
-
-      # ✅ Push to ACR (NO BUILD, just push)
-      - name: Login to ACR
-        run: |
-          az acr login --name $ACR_NAME
-
-      - name: Push Image to ACR
-        run: |
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:latest
-          docker push $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:latest
-
-      - name: Restart Web App
-        run: |
-          echo "♻️  Restarting Web App..."
-          az webapp restart \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
-
-      - name: Wait for App Startup
-        run: |
-          echo "⏳ Waiting 60 seconds for app to start..."
-          sleep 60
-
-      - name: Check Web App Health Status
-        run: |
-          echo "🏥 Checking Web App health status..."
-          
-          STATUS=$(az webapp show \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query state -o tsv)
-          
-          echo "Web App Status: $STATUS"
-          
-          if [ "$STATUS" = "Running" ]; then
-            echo "✅ Web App is running"
-          else
-            echo "⚠️  Web App status: $STATUS"
-            exit 1
-          fi
+        run: terraform plan
 
 # =====================================================
-# DEPLOY TO PROD
+# STAGE 5: ALL CHECKS PASSED
 # =====================================================
-  deploy-prod:
-    name: Deploy to PROD
-    needs: deploy-dev
+  all-checks-passed:
+    name: All Checks Passed
+    needs: [build, test, security-scan, terraform-checks]
     runs-on: ubuntu-latest
-    environment: prod
-    env:
-      TF_WORKSPACE: prod
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Login to Azure
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-
-      - name: Terraform Init
-        working-directory: infra
-        run: terraform init
-
-      - name: Terraform Apply (Infrastructure)
-        working-directory: infra
-        run: terraform apply -auto-approve
-
-      # ✅ Get ACR details AFTER infra is created
-      - name: Export Terraform Outputs
-        working-directory: infra
-        run: |
-          echo "ACR_NAME=$(terraform output -raw acr_name)" >> $GITHUB_ENV
-          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-          echo "WEBAPP_NAME=$(terraform output -raw webapp_name)" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)" >> $GITHUB_ENV
-
-      # ✅ Download the SAME image artifact from CI (no rebuild)
-      - name: Download Docker Image Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image-${{ github.sha }}
-          path: /tmp
-
-      # ✅ Load the Docker image
-      - name: Load Docker Image
-        run: |
-          docker load --input /tmp/image.tar
-
-      # ✅ Push to ACR (NO BUILD, just push)
-      - name: Login to ACR
-        run: |
-          az acr login --name $ACR_NAME
-
-      - name: Push Image to ACR
-        run: |
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:latest
-          docker push $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push $ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:latest
-
-      - name: Restart Web App
-        run: |
-          echo "♻️  Restarting Web App..."
-          az webapp restart \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP"
-
-      - name: Wait for App Startup
-        run: |
-          echo "⏳ Waiting 60 seconds for app to start..."
-          sleep 60
-
-      - name: Check Web App Health Status
-        run: |
-          echo "🏥 Checking Web App health status..."
-          
-          STATUS=$(az webapp show \
-            --name "$WEBAPP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query state -o tsv)
-          
-          echo "Web App Status: $STATUS"
-          
-          if [ "$STATUS" = "Running" ]; then
-            echo "✅ Web App is running"
-          else
-            echo "⚠️  Web App status: $STATUS"
-            exit 1
-          fi
+      - name: ✅ All PR validations passed
+        run: echo "✅ Ready to merge!"
